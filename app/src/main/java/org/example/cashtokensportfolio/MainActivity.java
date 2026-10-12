@@ -141,7 +141,10 @@ public class MainActivity extends Activity {
     synchronized(iconRequests){if(iconRequests.contains(category))return;iconRequests.add(category);}
     new Thread(()->{android.graphics.Bitmap bitmap=null;try{
       String uri;
-      if("666879bad15bbfb73ebea2b238f2d07ac3fac5dbec96182a5a1dd213211de012".equalsIgnoreCase(category)){
+      if("2469acc5afa4b10cb5b5c04afb89c3a3ffd61c5da9c01e26d00951cae2a02544".equalsIgnoreCase(category)){
+        // Use the icon URL provided for ParyonUSD.
+        uri="https://paryonusd.com/logo.svg";
+      }else if("666879bad15bbfb73ebea2b238f2d07ac3fac5dbec96182a5a1dd213211de012".equalsIgnoreCase(category)){
         // Use the exact SHIBCH icon URL published by TokenExplorer.cash.
         uri="https://ipfs.filebase.io/ipfs/bafybeibezwnacrpoq4beqnecpsi2znronhqjidu4aijuy4tcqbv2u2frla/666879bad15bbfb73ebea2b238f2d07ac3fac5dbec96182a5a1dd213211de012.png";
       }else{
