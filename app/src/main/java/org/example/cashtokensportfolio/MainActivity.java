@@ -310,13 +310,13 @@ public class MainActivity extends Activity {
         if("CashToken".equalsIgnoreCase(asset.optString("type"))){
           String bundledFile=bundledHistoryFile(asset);
           if(bundledFile!=null){
-            loadBundledCashTokenHistory(bundledFile,ts,ps);
+            loadBundledCashTokenHistory(bundledFile,ts,ps,isCauldronStablecoin(asset)?100d:1d);
             if(!ts.isEmpty())sourceLabel=" • bundled history";
           }
           if(ts.isEmpty()){
             String token=asset.optString("id").toLowerCase(Locale.US);long now=System.currentTimeMillis()/1000L;
             Object result=fetchAny("https://indexer.riften.net/cauldron/price/"+token+"/history?start=1&end="+now+"&stepsize=86400");
-            if(result instanceof JSONObject){JSONArray points=((JSONObject)result).optJSONArray("history");if(points!=null)for(int i=0;i<points.length();i++){JSONObject p=points.optJSONObject(i);if(p==null)continue;long time=p.optLong("time",0);double sats=p.optDouble("avg",Double.NaN);if(time>0&&Double.isFinite(sats)&&sats>=0){ts.add(time*1000L);ps.add(sats);}}}
+            if(result instanceof JSONObject){JSONArray points=((JSONObject)result).optJSONArray("history");if(points!=null)for(int i=0;i<points.length();i++){JSONObject p=points.optJSONObject(i);if(p==null)continue;long time=p.optLong("time",0);double priceUnits=p.optDouble("avg",Double.NaN);if(time>0&&Double.isFinite(priceUnits)&&priceUnits>=0){ts.add(time*1000L);ps.add(priceUnits*(isCauldronStablecoin(asset)?100d:1d));}}}
             if(!ts.isEmpty())sourceLabel=" • live Cauldron API";
           }
         }
@@ -334,7 +334,7 @@ public class MainActivity extends Activity {
     }).start();
     setContentView(scroll);applyThemeTo(page);
   }
-  String bundledHistoryFile(JSONObject asset){
+  // Cauldron prices for these USD stablecoins are expressed in micro-BCH units; convert to satoshi-equivalent values (x100) for charting and USD conversion.\n  boolean isCauldronStablecoin(JSONObject asset){\n    if(asset==null)return false;\n    String name=asset.optString("name","").toLowerCase(Locale.US).replaceAll("[^a-z0-9]","");\n    return name.equals("paryonusd")||name.equals("paryon")||name.equals("pusd")||name.equals("moriausd")||name.equals("moria")||name.equals("musd");\n  }\n  String bundledHistoryFile(JSONObject asset){
     String name=asset.optString("name","").toLowerCase(Locale.US).replaceAll("[^a-z0-9]","");
     if(name.equals("shibch")||name.equals("shibainu")||name.equals("shib")||name.equals("shibainucashtoken"))return "shibch_daily.json";
     if(name.equals("furu")||name.equals("furutoken")||name.equals("furutokens"))return "furu_daily.json";
@@ -342,7 +342,7 @@ public class MainActivity extends Activity {
     if(name.equals("moriausd")||name.equals("moria")||name.equals("musd"))return "moriausd_daily.json";
     return null;
   }
-  void loadBundledCashTokenHistory(String file,ArrayList<Long> timestamps,ArrayList<Double> prices)throws Exception{
+  void loadBundledCashTokenHistory(String file,ArrayList<Long> timestamps,ArrayList<Double> prices,double unitMultiplier)throws Exception{
     byte[] buffer=new byte[8192];ByteArrayOutputStream bytes=new ByteArrayOutputStream();
     try(InputStream input=getAssets().open("price_history/"+file)){int count;while((count=input.read(buffer))!=-1)bytes.write(buffer,0,count);}
     JSONObject root=new JSONObject(new String(bytes.toByteArray(),"UTF-8"));
@@ -350,7 +350,7 @@ public class MainActivity extends Activity {
     for(int i=0;i<points.length();i++){
       JSONObject point=points.optJSONObject(i);if(point==null)continue;
       long time=point.optLong("time",0);double price=point.optDouble("avg",Double.NaN);
-      if(time>0&&Double.isFinite(price)&&price>=0){timestamps.add(time*1000L);prices.add(price);}
+      if(time>0&&Double.isFinite(price)&&price>=0){timestamps.add(time*1000L);prices.add(price*unitMultiplier);}
     }
   }
   class HistoryGraph extends View{
@@ -558,7 +558,7 @@ public class MainActivity extends Activity {
         Double sats=extractLatestHistorySats(response);
         Double bch=prices.get("BCH:bch");
         if(sats!=null&&bch!=null){
-          double usd=sats/100000000d*bch;
+          double priceSatsEquivalent=sats*(isCauldronStablecoin(asset)?100d:1d);\n          double usd=priceSatsEquivalent/100000000d*bch;
           if(Double.isFinite(usd)&&usd>=0){prices.put(key(asset),usd);found++;}else missing++;
         }else missing++;
       }catch(Exception e){missing++;}
