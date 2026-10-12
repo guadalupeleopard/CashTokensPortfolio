@@ -275,7 +275,7 @@ public class MainActivity extends Activity {
     for(int i=0;i<assets.length();i++){JSONObject a=assets.optJSONObject(i);if(a==null)continue;Double price=prices.get(key(a));double qty=a.optDouble("quantity",0);if(price==null||!Double.isFinite(price)||price<0||qty<=0)continue;double value=qty*price;if(!Double.isFinite(value)||value<=0)continue;names.add(a.optString("name","Asset")+" ("+a.optString("type","")+")");values.add(value);colors.add(chartColors.get(chartColorKey(a)));sum+=value;}
     if(values.isEmpty()){TextView empty=label("No priced assets with a positive value are available to chart yet. Add assets and refresh market prices, then return here.",16);page.addView(empty);setContentView(scroll);applyThemeTo(page);return;}
     final double chartTotal=sum;
-    PieChartView pie=new PieChartView(this,values,colors,chartTotal);LinearLayout.LayoutParams pieLp=new LinearLayout.LayoutParams(-1,dp(300));pieLp.topMargin=dp(8);pieLp.gravity=Gravity.CENTER_HORIZONTAL;pie.setGravity(Gravity.CENTER);page.addView(pie,pieLp);
+    PieChartView pie=new PieChartView(this,values,colors,chartTotal);LinearLayout.LayoutParams pieLp=new LinearLayout.LayoutParams(-1,dp(300));pieLp.topMargin=dp(8);pieLp.gravity=Gravity.CENTER_HORIZONTAL;page.addView(pie,pieLp);
     TextView selected=label("Total charted value: "+formatValue(chartTotal),17);page.addView(selected);
     TextView instruction=label("Tap a 3D slice or an asset below. Both selections stay synchronized.",13);page.addView(instruction);
     ArrayList<LinearLayout> chartRows=new ArrayList<>();
