@@ -60,6 +60,7 @@ public class MainActivity extends Activity {
   int textColor(){return themeMode==1?Color.WHITE:themeMode==2?Color.WHITE:Color.BLACK;}
   int buttonColor(){return themeMode==1?Color.rgb(45,45,45):themeMode==2?Color.rgb(0,105,76):Color.rgb(235,241,239);}
   void openMenu(){String current=themeMode==0?"Day":themeMode==1?"Dark":"Bitcoin Cash Green";new AlertDialog.Builder(this).setTitle("Menu").setItems(new String[]{"Background: "+current,"Currency: "+displayCurrency,"Asset Price History","Donate","About"},(dialog,which)->{if(which==0)chooseTheme();else if(which==1)chooseCurrency();else if(which==2)chooseAssetForHistory();else if(which==3)showDonate();else if(which==4)showAbout();}).show();}
+  void showHistoryPage(){assetHistoryOpen=false;chartPageOpen=false;ScrollView scroll=new ScrollView(this);LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setPadding(dp(18),dp(16),dp(18),dp(24));page.setBackgroundColor(pageColor());scroll.addView(page);LinearLayout header=new LinearLayout(this);header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);Button back=new Button(this);back.setText("← Back");back.setOnClickListener(v->build());header.addView(back);TextView title=label("Asset Price History",22);header.addView(title,new LinearLayout.LayoutParams(0,-2,1f));page.addView(header);page.addView(label("Select an asset to view its available historical prices.",14));for(int i=0;i<assets.length();i++){JSONObject a=assets.optJSONObject(i);if(a==null)continue;Button b=new Button(this);b.setText(a.optString("name","Asset")+" ("+a.optString("type","")+")");b.setAllCaps(false);page.addView(b,new LinearLayout.LayoutParams(-1,-2));b.setOnClickListener(v->showAssetHistory(a));}setContentView(scroll);applyThemeTo(page);}
   void chooseAssetForHistory(){ArrayList<JSONObject> choices=new ArrayList<>();ArrayList<String> labels=new ArrayList<>();for(int i=0;i<assets.length();i++){JSONObject a=assets.optJSONObject(i);if(a!=null){choices.add(a);labels.add(a.optString("name","Asset")+" ("+a.optString("type","")+")");}}if(choices.isEmpty()){Toast.makeText(this,"Add an asset first.",Toast.LENGTH_SHORT).show();return;}new AlertDialog.Builder(this).setTitle("Choose asset price history").setItems(labels.toArray(new String[0]),(dialog,which)->{if(which>=0&&which<choices.size())showAssetHistory(choices.get(which));}).show();}
 
   final String DONATION_BCH="bitcoincash:qzdz6jxh5kjglqzr454x4pjmwwfw5p336uupk7adpg";
@@ -165,7 +166,7 @@ public class MainActivity extends Activity {
       return insets;
     });
     root=new LinearLayout(this);root.setPadding(dp(18),dp(20),dp(18),dp(20));root.setOrientation(1);root.setBackgroundColor(Color.rgb(244,249,247));scroll.addView(root);setContentView(scroll);
-    LinearLayout header=new LinearLayout(this);header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);ImageView appLogo=new ImageView(this);appLogo.setImageResource(R.drawable.cashtrack_icon);appLogo.setScaleType(ImageView.ScaleType.FIT_CENTER);LinearLayout.LayoutParams appLogoLp=new LinearLayout.LayoutParams(dp(48),dp(48));appLogoLp.rightMargin=dp(12);header.addView(appLogo,appLogoLp);TextView heading=label("CashTokens Portfolio",26);LinearLayout.LayoutParams headingLp=new LinearLayout.LayoutParams(0,-2,1f);header.addView(heading,headingLp);chartButton=new Button(this);chartButton.setText("◔");chartButton.setTextSize(30);chartButton.setGravity(Gravity.CENTER);chartButton.setMinWidth(0);chartButton.setMinimumWidth(0);chartButton.setPadding(0,0,0,0);chartButton.setLayoutParams(new LinearLayout.LayoutParams(dp(48),dp(48)));chartButton.setContentDescription("Open portfolio chart");header.addView(chartButton);chartButton.setOnClickListener(v->showChart());themeButton=new Button(this);themeButton.setText("☰");themeButton.setTextSize(24);themeButton.setGravity(Gravity.CENTER);themeButton.setMinWidth(0);themeButton.setMinimumWidth(0);themeButton.setPadding(0,0,0,0);themeButton.setLayoutParams(new LinearLayout.LayoutParams(dp(48),dp(48)));themeButton.setContentDescription("Open menu");header.addView(themeButton);themeButton.setOnClickListener(v->openMenu());root.addView(header);root.addView(label("Watch-only • Stored on this device",13));total=label("Total: —",23);root.addView(total);status=label("Prices not loaded",12);root.addView(status);
+    LinearLayout header=new LinearLayout(this);header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);ImageView appLogo=new ImageView(this);appLogo.setImageResource(R.drawable.cashtrack_icon);appLogo.setScaleType(ImageView.ScaleType.FIT_CENTER);LinearLayout.LayoutParams appLogoLp=new LinearLayout.LayoutParams(dp(48),dp(48));appLogoLp.rightMargin=dp(12);header.addView(appLogo,appLogoLp);TextView heading=label("CashTokens Portfolio",26);LinearLayout.LayoutParams headingLp=new LinearLayout.LayoutParams(0,-2,1f);header.addView(heading,headingLp);chartButton=new Button(this);chartButton.setText("◔");chartButton.setTextSize(30);chartButton.setGravity(Gravity.CENTER);chartButton.setMinWidth(0);chartButton.setMinimumWidth(0);chartButton.setPadding(0,0,0,0);chartButton.setLayoutParams(new LinearLayout.LayoutParams(dp(48),dp(48)));chartButton.setContentDescription("Open portfolio chart");header.addView(chartButton);chartButton.setOnClickListener(v->showChart());Button historyButton=new Button(this);historyButton.setText("↗");historyButton.setTextSize(26);historyButton.setGravity(Gravity.CENTER);historyButton.setMinWidth(0);historyButton.setMinimumWidth(0);historyButton.setPadding(0,0,0,0);historyButton.setLayoutParams(new LinearLayout.LayoutParams(dp(48),dp(48)));historyButton.setContentDescription("Open asset price history");header.addView(historyButton);historyButton.setOnClickListener(v->showHistoryPage());themeButton=new Button(this);themeButton.setText("☰");themeButton.setTextSize(24);themeButton.setGravity(Gravity.CENTER);themeButton.setMinWidth(0);themeButton.setMinimumWidth(0);themeButton.setPadding(0,0,0,0);themeButton.setLayoutParams(new LinearLayout.LayoutParams(dp(48),dp(48)));themeButton.setContentDescription("Open menu");header.addView(themeButton);themeButton.setOnClickListener(v->openMenu());root.addView(header);root.addView(label("Watch-only • Stored on this device",13));total=label("Total: —",23);root.addView(total);status=label("Prices not loaded",12);root.addView(status);
     addButton(root,"+ Add asset",this::addAssetDialog);addButton(root,"Refresh market prices",this::refresh);items=new LinearLayout(this);items.setOrientation(1);root.addView(items);render();}
 
   int chartAssetPreferredColor(JSONObject a){
@@ -296,7 +297,7 @@ public class MainActivity extends Activity {
     LinearLayout header=new LinearLayout(this);header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);
     Button back=new Button(this);back.setText("← Back");back.setOnClickListener(v->{assetHistoryOpen=false;build();});header.addView(back);
     TextView title=label(asset.optString("name","Asset")+" Price History",20);header.addView(title,new LinearLayout.LayoutParams(0,-2,1f));page.addView(header);
-    page.addView(label("Historical price in USD from the earliest available data.",14));
+    page.addView(label("BCH, Pi and USDT: USD market history. CashTokens: CauldronSwap prices in BCH satoshis.",14));
     LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.HORIZONTAL);page.addView(controls);
     TextView statusText=label("Loading historical prices…",14);page.addView(statusText);
     FrameLayout graphHolder=new FrameLayout(this);page.addView(graphHolder,new LinearLayout.LayoutParams(-1,dp(300)));
@@ -307,24 +308,23 @@ public class MainActivity extends Activity {
       ArrayList<Long> ts=new ArrayList<>();ArrayList<Double> ps=new ArrayList<>();String failure=null;
       try{
         if("CashToken".equalsIgnoreCase(asset.optString("type"))){
-          Object result=fetchAny("https://tokenstork.com/api/tokens/"+asset.optString("id").toLowerCase(Locale.US)+"/history");
-          if(result instanceof JSONObject){
-            JSONArray points=((JSONObject)result).optJSONArray("points");Double bch=prices.get("BCH:bch");
-            if(bch==null||bch<=0){JSONObject spot=fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin-cash&vs_currencies=usd");JSONObject obj=spot.optJSONObject("bitcoin-cash");if(obj!=null)bch=obj.optDouble("usd",0);}
-            if(points!=null&&bch!=null&&bch>0)for(int i=0;i<points.length();i++){JSONObject p=points.optJSONObject(i);if(p==null||p.isNull("priceSats"))continue;double sats=p.optDouble("priceSats",Double.NaN);long time=p.optLong("ts",0);if(time>0&&Double.isFinite(sats)&&sats>=0){ts.add(time<100000000000L?time*1000L:time);ps.add(sats/100000000d*bch);}}
-          }
+          String token=asset.optString("id").toLowerCase(Locale.US);long now=System.currentTimeMillis()/1000L;
+          Object result=fetchAny("https://indexer.riften.net/cauldron/price/"+token+"/history?start=0&end="+now+"&stepsize=86400");
+          if(result instanceof JSONObject){JSONArray points=((JSONObject)result).optJSONArray("history");if(points!=null)for(int i=0;i<points.length();i++){JSONObject p=points.optJSONObject(i);if(p==null)continue;long time=p.optLong("time",0);double sats=p.optDouble("avg",Double.NaN);if(time>0&&Double.isFinite(sats)&&sats>=0){ts.add(time*1000L);ps.add(sats);}}}
         }else{
-          String id="bitcoin-cash";String type=asset.optString("type","").toUpperCase(Locale.US);
-          if(type.equals("PI"))id="pi-network";else if(type.equals("USDT"))id="tether";
-          JSONObject data=fetch("https://api.coingecko.com/api/v3/coins/"+id+"/market_chart?vs_currency=usd&days=max");
-          JSONArray points=data.optJSONArray("prices");if(points!=null)for(int i=0;i<points.length();i++){JSONArray p=points.optJSONArray(i);if(p!=null&&p.length()>1){long time=p.optLong(0);double price=p.optDouble(1,Double.NaN);if(Double.isFinite(price)&&price>=0){ts.add(time);ps.add(price);}}}
+          String id="bch-bitcoin-cash";String type=asset.optString("type","").toUpperCase(Locale.US);
+          if(type.equals("PI"))id="pi-pi-network";else if(type.equals("USDT"))id="usdt-tether";
+          java.text.SimpleDateFormat fmt=new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.US);fmt.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+          JSONObject data=fetch("https://api.coinpaprika.com/v1/coins/"+id+"/ohlcv/historical?start=2010-01-01&end="+fmt.format(new java.util.Date()));
+          JSONArray points=data.optJSONArray("prices");if(points==null)points=data.optJSONArray("data");
+          if(points!=null)for(int i=0;i<points.length();i++){JSONObject p=points.optJSONObject(i);if(p!=null){String date=p.optString("time_open",p.optString("time_close",""));double price=p.optDouble("close",Double.NaN);if(date.length()>=10&&Double.isFinite(price)&&price>=0){try{long time=java.time.Instant.parse(date.length()==10?date+"T00:00:00Z":date).toEpochMilli();ts.add(time);ps.add(price);}catch(Exception ignored){}}}}
         }
       }catch(Exception e){failure="Could not load history. The provider may be unavailable or rate-limiting requests.";}
       final String err=failure;
       runOnUiThread(()->{
         timestamps.addAll(ts);priceValues.addAll(ps);
         if(priceValues.isEmpty()){statusText.setText(err==null?"No historical price data is available for this asset.":err);return;}
-        statusText.setText("Loaded "+priceValues.size()+" historical points • USD");
+        statusText.setText("Loaded "+priceValues.size()+" historical points"+("CashToken".equalsIgnoreCase(asset.optString("type"))?" • BCH satoshis":" • USD"));
         graph[0]=new HistoryGraph(this,timestamps,priceValues,interval[0]);graphHolder.addView(graph[0],new FrameLayout.LayoutParams(-1,-1));
         redraw[0]=()->{if(graph[0]!=null){graph[0].interval=interval[0];graph[0].invalidate();}};
         redraw[0].run();applyThemeTo(page);
