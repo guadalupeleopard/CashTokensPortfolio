@@ -55,7 +55,9 @@ public class MainActivity extends Activity {
       else if("USDT".equalsIgnoreCase(assetType))iconId=R.drawable.ic_asset_usdt;
       else iconId=R.drawable.ic_asset_cashtoken;
       LinearLayout.LayoutParams iconLp=new LinearLayout.LayoutParams(dp(22),dp(22));iconLp.rightMargin=dp(7);
-      icon.setImageResource(iconId);icon.setScaleType(ImageView.ScaleType.FIT_CENTER);titleRow.addView(icon,iconLp);if("CashToken".equalsIgnoreCase(assetType))loadCashTokenIcon(icon,a.optString("id"),a.optString("icon_mode","auto"),a.optString("icon_url",""));
+      icon.setImageResource(iconId);icon.setScaleType(ImageView.ScaleType.FIT_CENTER);titleRow.addView(icon,iconLp);String iconMode=a.optString("icon_mode","auto");
+      if("custom".equals(iconMode))loadCustomAssetIcon(icon,a.optString("icon_url",""));
+      else if("CashToken".equalsIgnoreCase(assetType))loadCashTokenIcon(icon,a.optString("id"),iconMode,a.optString("icon_url",""));
       TextView assetTitle=label(title+" ("+assetType+")",18);assetTitle.setPadding(dp(2),dp(8),dp(4),dp(8));titleRow.addView(assetTitle);
       row.addView(titleRow);row.addView(label("Quantity: "+a.optString("quantity")+"   •   "+val,15));
       addButton(row,"Edit / Remove",()->editDialog(index));
@@ -69,7 +71,7 @@ public class MainActivity extends Activity {
     EditText name=input("Token name",old.optString("name",type.equals("CashToken")?"":type));EditText id=input(type.equals("CashToken")?"CashToken category ID (64 hex chars)":"Asset ID",old.optString("id",type.toLowerCase(Locale.US)));
     EditText qty=input("Quantity",old.optString("quantity",""));qty.setInputType(8194);box.addView(name);if(type.equals("CashToken"))box.addView(id);box.addView(qty);
     final String[] iconModes={"auto","default","custom"};
-    final String[] iconLabels={"Automatic (known token / BCMR icon)","Default CashToken icon","Custom image URL"};
+    final String[] iconLabels={"Automatic (built-in / BCMR icon)","Default app icon","Custom image URL"};
     final String[] selectedIconMode={old.optString("icon_mode","auto")};
     EditText iconUrl=input("Custom icon URL (https://…)",old.optString("icon_url",""));
     Spinner iconChoice=new Spinner(this);
@@ -78,7 +80,7 @@ public class MainActivity extends Activity {
     int selectedIndex=0;for(int m=0;m<iconModes.length;m++)if(iconModes[m].equals(selectedIconMode[0]))selectedIndex=m;
     iconChoice.setSelection(selectedIndex);
     TextView iconHint=label("Icon choice",14);
-    if(type.equals("CashToken")){box.addView(iconHint);box.addView(iconChoice);if(selectedIndex==2)box.addView(iconUrl);
+    {box.addView(iconHint);box.addView(iconChoice);if(selectedIndex==2)box.addView(iconUrl);
       iconChoice.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
         public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long rowId){
           selectedIconMode[0]=iconModes[position];
@@ -112,7 +114,7 @@ public class MainActivity extends Activity {
       });
     }
     new AlertDialog.Builder(this).setTitle((index>=0?"Edit ":"Add ")+type).setView(box).setNegativeButton("Cancel",null).setPositiveButton("Save",(d,w)->{try{String q=qty.getText().toString().trim();BigDecimal quantity=new BigDecimal(q);if(quantity.signum()<0)throw new Exception("Quantity cannot be negative");String identifier=type.equals("CashToken")?id.getText().toString().trim().toLowerCase(Locale.US):type.toLowerCase(Locale.US);if(type.equals("CashToken")&&!identifier.matches("[a-f0-9]{64}"))throw new Exception("CashToken category ID must be 64 hexadecimal characters");if(name.getText().toString().trim().isEmpty()||"Looking up token name…".contentEquals(name.getText()))throw new Exception("Enter a token name or wait for the token lookup to finish");JSONObject obj=new JSONObject();obj.put("type",type);obj.put("name",name.getText().toString().trim());obj.put("id",identifier);obj.put("quantity",quantity.toPlainString());
-      if(type.equals("CashToken")){
+      {
         String mode=selectedIconMode[0];String customUrl=iconUrl.getText().toString().trim();
         if("custom".equals(mode)&&!(customUrl.startsWith("https://")||customUrl.startsWith("http://")))throw new Exception("Enter a valid custom icon URL beginning with https:// or http://");
         obj.put("icon_mode",mode);obj.put("icon_url","custom".equals(mode)?customUrl:"");
@@ -217,6 +219,15 @@ public class MainActivity extends Activity {
       if(bitmap==null){String svgText=new String(imageBytes,"UTF-8").replace("\\uFEFF","").trim();if(svgText.toLowerCase(Locale.US).contains("<svg")){SVG svg=SVG.getFromString(svgText);Bitmap rendered=Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888);Canvas canvas=new Canvas(rendered);svg.renderToCanvas(canvas,new android.graphics.RectF(0,0,96,96));bitmap=rendered;}}
       return bitmap;
     }finally{conn.disconnect();}
+  }
+  void loadCustomAssetIcon(ImageView target,String customIconUrl){
+    if(customIconUrl==null||!(customIconUrl.startsWith("https://")||customIconUrl.startsWith("http://")))return;
+    String cacheKey="custom:"+customIconUrl;
+    android.graphics.Bitmap cached=cashTokenIconCache.get(cacheKey);if(cached!=null){target.setImageBitmap(cached);return;}
+    synchronized(iconRequests){if(iconRequests.contains(cacheKey))return;iconRequests.add(cacheKey);}
+    new Thread(()->{android.graphics.Bitmap bitmap=null;try{bitmap=downloadIconBitmap(customIconUrl);}catch(Exception ignored){}finally{synchronized(iconRequests){iconRequests.remove(cacheKey);}}
+      if(bitmap!=null){cashTokenIconCache.put(cacheKey,bitmap);runOnUiThread(()->{if(!isFinishing())render();});}
+    }).start();
   }
   void loadCashTokenIcon(ImageView target,String category,String iconMode,String customIconUrl){
     if("default".equals(iconMode)){target.setImageResource(R.drawable.ic_asset_cashtoken);return;}
