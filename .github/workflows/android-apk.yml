@@ -56,10 +56,13 @@ jobs:
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
 
+      - name: Rename APK for download
+        run: mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/CashTrack-debug.apk
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: CashTrack-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/debug/CashTrack-debug.apk
           if-no-files-found: error
           retention-days: 14
