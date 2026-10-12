@@ -70,7 +70,7 @@ public class MainActivity extends Activity {
   void addAssetDialog(){String[] types={"BCH","PI","USDT","CashToken"};new AlertDialog.Builder(this).setTitle("Choose asset").setItems(types,(d,which)->assetForm(-1,types[which])).show();}
   void editDialog(int index){new AlertDialog.Builder(this).setTitle("Manage asset").setItems(new String[]{"Edit","Remove"},(d,w)->{if(w==0)assetForm(index,assets.optJSONObject(index).optString("type"));else new AlertDialog.Builder(this).setMessage("Remove this asset?").setNegativeButton("Cancel",null).setPositiveButton("Remove",(dd,ww)->{assets.remove(index);save();render();}).show();}).show();}
   void assetForm(int index,String type){JSONObject old=index>=0?assets.optJSONObject(index):new JSONObject();LinearLayout box=new LinearLayout(this);box.setPadding(dp(18),0,dp(18),0);box.setOrientation(1);
-    EditText name=input("Token name",old.optString("name",type.equals("CashToken")?"":type));EditText id=input(type.equals("CashToken")?"CashToken category ID (64 hex chars)":"Asset ID",old.optString("id",type.toLowerCase(Locale.US)));
+    EditText name=input("Token name",old.optString("name",type.equals("CashToken")?"":type));EditText id=input(type.equals("CashToken")?"Input CashToken ID here":"Asset ID",old.optString("id",type.equals("CashToken")?"":type.toLowerCase(Locale.US)));if(type.equals("CashToken"))id.setHintTextColor(Color.GRAY);
     EditText qty=input("Quantity",old.optString("quantity",""));qty.setInputType(8194);box.addView(name);if(type.equals("CashToken"))box.addView(id);box.addView(qty);
     final String[] iconModes={"auto","default","custom"};
     final String[] iconLabels={"Automatic (built-in / BCMR icon)","Default app icon","Custom image URL"};
