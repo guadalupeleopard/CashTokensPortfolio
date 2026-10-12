@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.CashTrack" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowSplashScreenBackground">#FFFFFF</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/cashtrack_icon</item>
+        <item name="android:postSplashScreenTheme">@style/Theme.CashTrack.App</item>
+    </style>
+    <style name="Theme.CashTrack.App" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>
