@@ -150,6 +150,9 @@ public class MainActivity extends Activity {
       }else if("666879bad15bbfb73ebea2b238f2d07ac3fac5dbec96182a5a1dd213211de012".equalsIgnoreCase(category)){
         // Use the exact SHIBCH icon URL published by TokenExplorer.cash.
         uri="https://ipfs.filebase.io/ipfs/bafybeibezwnacrpoq4beqnecpsi2znronhqjidu4aijuy4tcqbv2u2frla/666879bad15bbfb73ebea2b238f2d07ac3fac5dbec96182a5a1dd213211de012.png";
+      }else if("d9ab24ed15a7846cc3d9e004aa5cb976860f13dac1ead05784ee4f4622af96ea".equalsIgnoreCase(category)){
+        // Use the Furu Tokens icon URL provided by the user.
+        uri="https://ipfs.filebase.io/ipfs/bafkreicqqq3tkq5tkbtg3vhbhw6urybothpoedsszuejs5baq2k25mhgvu";
       }else{
         Object meta=fetchAny("https://bcmr.paytaca.com/api/tokens/"+category.toLowerCase(Locale.US));
         uri=extractIconUri(meta);
