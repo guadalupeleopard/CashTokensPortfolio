@@ -315,9 +315,10 @@ public class MainActivity extends Activity {
           String id="bch-bitcoin-cash";String type=asset.optString("type","").toUpperCase(Locale.US);
           if(type.equals("PI"))id="pi-pi-network";else if(type.equals("USDT"))id="usdt-tether";
           java.text.SimpleDateFormat fmt=new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.US);fmt.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
-          JSONObject data=fetch("https://api.coinpaprika.com/v1/coins/"+id+"/ohlcv/historical?start=2010-01-01&end="+fmt.format(new java.util.Date()));
-          JSONArray points=data.optJSONArray("prices");if(points==null)points=data.optJSONArray("data");
-          if(points!=null)for(int i=0;i<points.length();i++){JSONObject p=points.optJSONObject(i);if(p!=null){String date=p.optString("time_open",p.optString("time_close",""));double price=p.optDouble("close",Double.NaN);if(date.length()>=10&&Double.isFinite(price)&&price>=0){try{long time=java.time.Instant.parse(date.length()==10?date+"T00:00:00Z":date).toEpochMilli();ts.add(time);ps.add(price);}catch(Exception ignored){}}}}
+          Object response=fetchAny("https://api.coinpaprika.com/v1/coins/"+id+"/ohlcv/historical?start=2010-01-01&end="+fmt.format(new java.util.Date()));
+          JSONArray points=response instanceof JSONArray?(JSONArray)response:null;
+          if(response instanceof JSONObject){JSONObject data=(JSONObject)response;points=data.optJSONArray("prices");if(points==null)points=data.optJSONArray("data");}
+          if(points!=null)for(int i=0;i<points.length();i++){JSONObject p=points.optJSONObject(i);if(p!=null){String date=p.optString("time_open",p.optString("time_close",""));double price=p.optDouble("close",Double.NaN);if(date.length()>=10&&Double.isFinite(price)&&price>=0){try{java.util.Date parsed=fmt.parse(date.substring(0,10));if(parsed!=null){ts.add(parsed.getTime());ps.add(price);}}catch(Exception ignored){}}}}
         }
       }catch(Exception e){failure="Could not load history. The provider may be unavailable or rate-limiting requests.";}
       final String err=failure;
