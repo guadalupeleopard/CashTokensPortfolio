@@ -252,7 +252,7 @@ public class MainActivity extends Activity {
         uri="https://meta.moria.money/m1.png";
       }else if("2469acc5afa4b10cb5b5c04afb89c3a3ffd61c5da9c01e26d00951cae2a02544".equalsIgnoreCase(category)){
         // Use the icon URL provided for ParyonUSD.
-        uri="https://paryonusd.com/logo.svg";
+        uri="https://meta.riften.net/icon/2469acc5afa4b10cb5b5c04afb89c3a3ffd61c5da9c01e26d00951cae2a02544";
       }else if("666879bad15bbfb73ebea2b238f2d07ac3fac5dbec96182a5a1dd213211de012".equalsIgnoreCase(category)){
         // Use the exact SHIBCH icon URL published by TokenExplorer.cash.
         uri="https://ipfs.filebase.io/ipfs/bafybeibezwnacrpoq4beqnecpsi2znronhqjidu4aijuy4tcqbv2u2frla/666879bad15bbfb73ebea2b238f2d07ac3fac5dbec96182a5a1dd213211de012.png";
