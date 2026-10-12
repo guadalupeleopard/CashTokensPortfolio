@@ -141,7 +141,10 @@ public class MainActivity extends Activity {
     synchronized(iconRequests){if(iconRequests.contains(category))return;iconRequests.add(category);}
     new Thread(()->{android.graphics.Bitmap bitmap=null;try{
       String uri;
-      if("2469acc5afa4b10cb5b5c04afb89c3a3ffd61c5da9c01e26d00951cae2a02544".equalsIgnoreCase(category)){
+      if("b38a33f750f84c5c169a6f23cb873e6e79605021585d4f3408789689ed87f366".equalsIgnoreCase(category)){
+        // Use the Moria icon URL provided for this CashToken.
+        uri="https://meta.moria.money/m1.png";
+      }else if("2469acc5afa4b10cb5b5c04afb89c3a3ffd61c5da9c01e26d00951cae2a02544".equalsIgnoreCase(category)){
         // Use the icon URL provided for ParyonUSD.
         uri="https://paryonusd.com/logo.svg";
       }else if("666879bad15bbfb73ebea2b238f2d07ac3fac5dbec96182a5a1dd213211de012".equalsIgnoreCase(category)){
