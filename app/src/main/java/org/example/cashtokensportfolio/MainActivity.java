@@ -58,7 +58,7 @@ public class MainActivity extends Activity {
   int buttonColor(){return themeMode==1?Color.rgb(45,45,45):themeMode==2?Color.rgb(0,105,76):Color.rgb(235,241,239);}
   void openMenu(){String current=themeMode==0?"Day":themeMode==1?"Dark":"Bitcoin Cash Green";new AlertDialog.Builder(this).setTitle("Menu").setItems(new String[]{"Background: "+current,"Currency: "+displayCurrency,"Donate","About"},(dialog,which)->{if(which==0)chooseTheme();else if(which==1)chooseCurrency();else if(which==2)showDonate();else if(which==3)showAbout();}).show();}
 
-  final String DONATION_BCH="zzdz6jxh5kjglqzr454x4pjmwwfw5p336umt9qnt7m";
+  final String DONATION_BCH="bitcoincash:qzdz6jxh5kjglqzr454x4pjmwwfw5p336uupk7adpg";
   final String DONATION_TOKEN="bitcoincash:zzdz6jxh5kjglqzr454x4pjmwwfw5p336umt9qnt7m";
   void copyDonation(String address){
     android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
