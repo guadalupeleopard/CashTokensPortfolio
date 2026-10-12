@@ -9,6 +9,8 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import com.caverock.androidsvg.SVG;
 import android.view.*;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.widget.*;
 import org.json.*;
 import java.net.*;
@@ -66,7 +68,51 @@ public class MainActivity extends Activity {
   void assetForm(int index,String type){JSONObject old=index>=0?assets.optJSONObject(index):new JSONObject();LinearLayout box=new LinearLayout(this);box.setPadding(dp(18),0,dp(18),0);box.setOrientation(1);
     EditText name=input("Token name",old.optString("name",type.equals("CashToken")?"":type));EditText id=input(type.equals("CashToken")?"CashToken category ID (64 hex chars)":"Asset ID",old.optString("id",type.toLowerCase(Locale.US)));
     EditText qty=input("Quantity",old.optString("quantity",""));qty.setInputType(8194);box.addView(name);if(type.equals("CashToken"))box.addView(id);box.addView(qty);
-    new AlertDialog.Builder(this).setTitle("Add "+type).setView(box).setNegativeButton("Cancel",null).setPositiveButton("Save",(d,w)->{try{String q=qty.getText().toString().trim();BigDecimal quantity=new BigDecimal(q);if(quantity.signum()<0)throw new Exception("Quantity cannot be negative");String identifier=type.equals("CashToken")?id.getText().toString().trim().toLowerCase(Locale.US):type.toLowerCase(Locale.US);if(type.equals("CashToken")&&!identifier.matches("[a-f0-9]{64}"))throw new Exception("CashToken category ID must be 64 hexadecimal characters");if(name.getText().toString().trim().isEmpty())throw new Exception("Enter a token name");JSONObject obj=new JSONObject();obj.put("type",type);obj.put("name",name.getText().toString().trim());obj.put("id",identifier);obj.put("quantity",quantity.toPlainString());if(index<0)assets.put(obj);else assets.put(index,obj);save();render();refresh();}catch(Exception e){new AlertDialog.Builder(this).setMessage(e.getMessage()).setPositiveButton("OK",null).show();}}).show();
+    if(type.equals("CashToken")){
+      final String[] lastLookup={""};
+      id.addTextChangedListener(new TextWatcher(){
+        public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+        public void onTextChanged(CharSequence s,int start,int before,int count){
+          String category=s.toString().trim().toLowerCase(Locale.US);
+          if(category.matches("[a-f0-9]{64}")&&!category.equals(lastLookup[0])){
+            lastLookup[0]=category;
+            name.setText("Looking up token name…");
+            new Thread(()->{
+              String tokenName=null;
+              try{tokenName=extractTokenName(fetchAny("https://bcmr.paytaca.com/api/tokens/"+category));}catch(Exception ignored){}
+              final String resolved=tokenName;
+              runOnUiThread(()->{
+                if(!category.equals(id.getText().toString().trim().toLowerCase(Locale.US)))return;
+                if(resolved!=null&&!resolved.trim().isEmpty())name.setText(resolved.trim());
+                else if("Looking up token name…".contentEquals(name.getText()))name.setText("");
+              });
+            }).start();
+          }else if(!category.matches("[a-f0-9]{64}")){lastLookup[0]="";}
+        }
+        public void afterTextChanged(Editable s){}
+      });
+    }
+    new AlertDialog.Builder(this).setTitle((index>=0?"Edit ":"Add ")+type).setView(box).setNegativeButton("Cancel",null).setPositiveButton("Save",(d,w)->{try{String q=qty.getText().toString().trim();BigDecimal quantity=new BigDecimal(q);if(quantity.signum()<0)throw new Exception("Quantity cannot be negative");String identifier=type.equals("CashToken")?id.getText().toString().trim().toLowerCase(Locale.US):type.toLowerCase(Locale.US);if(type.equals("CashToken")&&!identifier.matches("[a-f0-9]{64}"))throw new Exception("CashToken category ID must be 64 hexadecimal characters");if(name.getText().toString().trim().isEmpty()||"Looking up token name…".contentEquals(name.getText()))throw new Exception("Enter a token name or wait for the token lookup to finish");JSONObject obj=new JSONObject();obj.put("type",type);obj.put("name",name.getText().toString().trim());obj.put("id",identifier);obj.put("quantity",quantity.toPlainString());if(index<0)assets.put(obj);else assets.put(index,obj);save();render();refresh();}catch(Exception e){new AlertDialog.Builder(this).setMessage(e.getMessage()).setPositiveButton("OK",null).show();}}).show();
+  }
+
+  String extractTokenName(Object value){
+    if(value instanceof JSONObject){
+      JSONObject o=(JSONObject)value;
+      for(String field:new String[]{"name","token_name","tokenName","display_name","displayName"}){
+        String candidate=o.optString(field,"").trim();
+        if(!candidate.isEmpty()&&!"null".equalsIgnoreCase(candidate))return candidate;
+      }
+      for(String field:new String[]{"identity","snapshot","token","metadata","data","result","registry","identities"}){
+        String candidate=extractTokenName(o.opt(field));
+        if(candidate!=null)return candidate;
+      }
+      Iterator<String> keys=o.keys();
+      while(keys.hasNext()){String candidate=extractTokenName(o.opt(keys.next()));if(candidate!=null)return candidate;}
+    }else if(value instanceof JSONArray){
+      JSONArray a=(JSONArray)value;
+      for(int i=0;i<a.length();i++){String candidate=extractTokenName(a.opt(i));if(candidate!=null)return candidate;}
+    }
+    return null;
   }
   void refresh(){status.setText("Fetching prices…");new Thread(()->{
     StringBuilder notes=new StringBuilder();
