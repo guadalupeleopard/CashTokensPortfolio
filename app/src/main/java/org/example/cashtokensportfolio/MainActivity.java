@@ -57,6 +57,7 @@ public class MainActivity extends Activity {
       LinearLayout.LayoutParams iconLp=new LinearLayout.LayoutParams(dp(22),dp(22));iconLp.rightMargin=dp(7);
       icon.setImageResource(iconId);icon.setScaleType(ImageView.ScaleType.FIT_CENTER);titleRow.addView(icon,iconLp);String iconMode=a.optString("icon_mode","auto");
       if("custom".equals(iconMode))loadCustomAssetIcon(icon,a.optString("icon_url",""));
+      else if("default".equals(iconMode))icon.setImageResource(R.drawable.ic_asset_cashtoken);
       else if("CashToken".equalsIgnoreCase(assetType))loadCashTokenIcon(icon,a.optString("id"),iconMode,a.optString("icon_url",""));
       TextView assetTitle=label(title+" ("+assetType+")",18);assetTitle.setPadding(dp(2),dp(8),dp(4),dp(8));titleRow.addView(assetTitle);
       row.addView(titleRow);row.addView(label("Quantity: "+a.optString("quantity")+"   •   "+val,15));
