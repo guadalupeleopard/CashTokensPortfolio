@@ -305,9 +305,8 @@ public class MainActivity extends Activity {
     final HistoryGraph[] graph={null};final Runnable[] redraw={()->{}};
     for(String option:new String[]{"Daily","Weekly","Monthly"}){Button b=new Button(this);b.setText(option);controls.addView(b,new LinearLayout.LayoutParams(0,-2,1f));b.setOnClickListener(v->{interval[0]=option;for(int j=0;j<controls.getChildCount();j++)controls.getChildAt(j).setAlpha(controls.getChildAt(j)==b?1f:0.65f);redraw[0].run();});}
     new Thread(()->{
-      ArrayList<Long> ts=new ArrayList<>();ArrayList<Double> ps=new ArrayList<>();String failure=null;
+      ArrayList<Long> ts=new ArrayList<>();ArrayList<Double> ps=new ArrayList<>();String failure=null;String sourceLabel="";
       try{
-        String sourceLabel="";
         if("CashToken".equalsIgnoreCase(asset.optString("type"))){
           String bundledFile=bundledHistoryFile(asset);
           if(bundledFile!=null){
