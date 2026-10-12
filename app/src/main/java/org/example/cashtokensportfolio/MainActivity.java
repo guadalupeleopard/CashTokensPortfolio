@@ -56,7 +56,24 @@ public class MainActivity extends Activity {
   int cardColor(){return themeMode==1?Color.rgb(18,18,18):themeMode==2?Color.rgb(7,151,108):Color.WHITE;}
   int textColor(){return themeMode==1?Color.WHITE:themeMode==2?Color.WHITE:Color.BLACK;}
   int buttonColor(){return themeMode==1?Color.rgb(45,45,45):themeMode==2?Color.rgb(0,105,76):Color.rgb(235,241,239);}
-  void openMenu(){String current=themeMode==0?"Day":themeMode==1?"Dark":"Bitcoin Cash Green";new AlertDialog.Builder(this).setTitle("Menu").setItems(new String[]{"Background: "+current,"Currency: "+displayCurrency},(dialog,which)->{if(which==0)chooseTheme();else if(which==1)chooseCurrency();}).show();}
+  void openMenu(){String current=themeMode==0?"Day":themeMode==1?"Dark":"Bitcoin Cash Green";new AlertDialog.Builder(this).setTitle("Menu").setItems(new String[]{"Background: "+current,"Currency: "+displayCurrency,"About"},(dialog,which)->{if(which==0)chooseTheme();else if(which==1)chooseCurrency();else if(which==2)showAbout();}).show();}
+  void showAbout(){
+    String version="Unknown";
+    try{
+      android.content.pm.PackageInfo info=getPackageManager().getPackageInfo(getPackageName(),0);
+      version=info.versionName+" (build "+(Build.VERSION.SDK_INT>=28?info.getLongVersionCode():info.versionCode)+")";
+    }catch(Exception ignored){}
+    LinearLayout layout=new LinearLayout(this);
+    layout.setOrientation(LinearLayout.VERTICAL);
+    layout.setPadding(dp(24),dp(12),dp(24),dp(8));
+    TextView details=new TextView(this);
+    details.setText("CashTrack is a CashTokens and other cryptocurrencies tracker.\n\nVersion: "+version+"\n\nContact: francis105d1@gmail.com\n\nOfficial GitHub repository:\nhttps://github.com/guadalupeleopard/CashTokensPortfolio");
+    details.setTextSize(15);
+    details.setAutoLinkMask(android.text.util.Linkify.EMAIL_ADDRESSES|android.text.util.Linkify.WEB_URLS);
+    details.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
+    layout.addView(details);
+    new AlertDialog.Builder(this).setTitle("About CashTrack").setView(layout).setPositiveButton("Close",null).show();
+  }
   void chooseCurrency(){new AlertDialog.Builder(this).setTitle("Display currency").setSingleChoiceItems(currencyNames,Math.max(0,Arrays.asList(currencyCodes).indexOf(displayCurrency)),(dialog,which)->{displayCurrency=currencyCodes[which];getPreferences(0).edit().putString("display_currency",displayCurrency).apply();dialog.dismiss();render();refresh();}).setNegativeButton("Cancel",null).show();}
   String currencySymbol(){switch(displayCurrency){case "BCH":return "BCH ";case "MXN":return "MX$";case "ARS":return "AR$";case "VND":return "₫";case "PHP":return "₱";case "JPY":return "¥";case "CNY":return "元";default:return "$";}}
   String formatValue(double usdValue){double value=displayCurrency.equals("BCH")?(currencyRate>0?usdValue/currencyRate:0):usdValue*currencyRate;String formatted=String.format(Locale.US,"%,.2f",value);if(displayCurrency.equals("BCH"))formatted=String.format(Locale.US,"%,.8f",value);return currencySymbol()+formatted;}
