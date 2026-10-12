@@ -4,6 +4,18 @@ android {
     namespace = "org.example.cashtokensportfolio"
     compileSdk = 35
 
+    // GitHub Actions installs the repository's persistent signing keystore at
+    // ~/.android/debug.keystore before Gradle runs. Use it explicitly for every
+    // build type so debug and release APKs share the same signing identity.
+    signingConfigs {
+        create("cashTrack") {
+            storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     defaultConfig {
         applicationId = "org.example.cashtokensportfolio"
         minSdk = 26
@@ -12,6 +24,16 @@ android {
         // newer APKs to install over older ones. Local builds default to 2.
         versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 2
         versionName = "1.0"
+    }
+
+    buildTypes {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("cashTrack")
+        }
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("cashTrack")
+            isMinifyEnabled = false
+        }
     }
 }
 
