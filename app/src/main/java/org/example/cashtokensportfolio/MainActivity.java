@@ -5,6 +5,9 @@ import android.os.*;
 import android.content.*;
 import android.graphics.Color;
 import android.graphics.BitmapFactory;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import com.caverock.androidsvg.SVG;
 import android.view.*;
 import android.widget.*;
 import org.json.*;
@@ -113,7 +116,7 @@ public class MainActivity extends Activity {
         if(imageUrl.startsWith("ipfs://")){String path=imageUrl.substring(7);if(path.startsWith("ipfs/"))path=path.substring(5);imageUrl="https://ipfs.io/ipfs/"+path;}
         if(imageUrl.startsWith("https://")||imageUrl.startsWith("http://")){
           HttpURLConnection conn=(HttpURLConnection)new URL(imageUrl).openConnection();conn.setConnectTimeout(10000);conn.setReadTimeout(10000);conn.setInstanceFollowRedirects(true);conn.setRequestProperty("User-Agent","CashTokensPortfolio/1.2");
-          try(InputStream in=conn.getInputStream()){bitmap=BitmapFactory.decodeStream(in);}finally{conn.disconnect();}
+          try(InputStream in=conn.getInputStream()){ByteArrayOutputStream bytes=new ByteArrayOutputStream();byte[] buf=new byte[4096];int n;while((n=in.read(buf))!=-1&&bytes.size()<2097152)bytes.write(buf,0,n);byte[] imageBytes=bytes.toByteArray();bitmap=BitmapFactory.decodeByteArray(imageBytes,0,imageBytes.length);if(bitmap==null){String svgText=new String(imageBytes,"UTF-8");if(svgText.contains("<svg")){SVG svg=SVG.getFromString(svgText);Bitmap rendered=Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888);Canvas canvas=new Canvas(rendered);svg.renderToCanvas(canvas,new android.graphics.RectF(0,0,96,96));bitmap=rendered;}}}finally{conn.disconnect();}
         }
       }
     }catch(Exception ignored){}finally{synchronized(iconRequests){iconRequests.remove(category);}}
