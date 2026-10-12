@@ -21,6 +21,10 @@ import java.util.*;
 public class MainActivity extends Activity {
   LinearLayout root, items; TextView total, status; Button themeButton; JSONArray assets = new JSONArray();
   int themeMode=0; // 0=Day, 1=Dark, 2=Bitcoin Cash
+  String displayCurrency="USD";
+  double currencyRate=1.0;
+  final String[] currencyCodes={"USD","BCH","MXN","ARS","VND","PHP","JPY","CNY"};
+  final String[] currencyNames={"US Dollar (USD)","Bitcoin Cash (BCH)","Mexican Peso (MXN)","Argentine Peso (ARS)","Vietnamese Dong (VND)","Philippine Peso (PHP)","Japanese Yen (JPY)","Chinese Yuan (CNY)"};
   final HashMap<String, Double> prices = new HashMap<>();
   final HashMap<String, String> ids = new HashMap<>();
   final HashMap<String, android.graphics.Bitmap> cashTokenIconCache = new HashMap<>();
@@ -52,11 +56,14 @@ public class MainActivity extends Activity {
   int cardColor(){return themeMode==1?Color.rgb(18,18,18):themeMode==2?Color.rgb(7,151,108):Color.WHITE;}
   int textColor(){return themeMode==1?Color.WHITE:themeMode==2?Color.WHITE:Color.BLACK;}
   int buttonColor(){return themeMode==1?Color.rgb(45,45,45):themeMode==2?Color.rgb(0,105,76):Color.rgb(235,241,239);}
-  void openMenu(){String current=themeMode==0?"Day":themeMode==1?"Dark":"Bitcoin Cash Green";new AlertDialog.Builder(this).setTitle("Menu").setItems(new String[]{"Background: "+current},(dialog,which)->{if(which==0)chooseTheme();}).show();}
+  void openMenu(){String current=themeMode==0?"Day":themeMode==1?"Dark":"Bitcoin Cash Green";new AlertDialog.Builder(this).setTitle("Menu").setItems(new String[]{"Background: "+current,"Currency: "+displayCurrency},(dialog,which)->{if(which==0)chooseTheme();else if(which==1)chooseCurrency();}).show();}
+  void chooseCurrency(){new AlertDialog.Builder(this).setTitle("Display currency").setSingleChoiceItems(currencyNames,Math.max(0,Arrays.asList(currencyCodes).indexOf(displayCurrency)),(dialog,which)->{displayCurrency=currencyCodes[which];getPreferences(0).edit().putString("display_currency",displayCurrency).apply();dialog.dismiss();render();refresh();}).setNegativeButton("Cancel",null).show();}
+  String currencySymbol(){switch(displayCurrency){case "BCH":return "BCH ";case "MXN":return "MX$";case "ARS":return "AR$";case "VND":return "₫";case "PHP":return "₱";case "JPY":return "¥";case "CNY":return "元";default:return "$";}}
+  String formatValue(double usdValue){double value=displayCurrency.equals("BCH")?(currencyRate>0?usdValue/currencyRate:0):usdValue*currencyRate;String formatted=String.format(Locale.US,"%,.2f",value);if(displayCurrency.equals("BCH"))formatted=String.format(Locale.US,"%,.8f",value);return currencySymbol()+formatted;}
   void chooseTheme(){new AlertDialog.Builder(this).setTitle("Choose background").setItems(new String[]{"☀  Day","☾  Dark","₿  Bitcoin Cash Green"},(dialog,which)->{themeMode=which;getPreferences(0).edit().putInt("theme_mode",themeMode).apply();applyTheme();}).show();}
   void applyTheme(){updateNavigationBarAppearance();if(root==null)return;root.setBackgroundColor(pageColor());if(themeButton!=null){themeButton.setText("☰");themeButton.setContentDescription("Open menu");}applyThemeTo(root);}
   void applyThemeTo(View view){if(view instanceof TextView){((TextView)view).setTextColor(textColor());}if(view instanceof Button){view.setBackgroundTintList(android.content.res.ColorStateList.valueOf(buttonColor()));}if(view instanceof LinearLayout){LinearLayout ll=(LinearLayout)view;if(ll==root)ll.setBackgroundColor(pageColor());else if(ll==items){}else if(ll.getOrientation()==LinearLayout.VERTICAL&&ll.getChildCount()>0)ll.setBackgroundColor(cardColor());}if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++)applyThemeTo(group.getChildAt(i));}}
-  @Override public void onCreate(Bundle b){super.onCreate(b);themeMode=getPreferences(0).getInt("theme_mode",0);configureNavigationBar();try{assets=new JSONArray(getPreferences(0).getString(PREF,"[]"));}catch(Exception ignored){} build(); refresh();}
+  @Override public void onCreate(Bundle b){super.onCreate(b);themeMode=getPreferences(0).getInt("theme_mode",0);displayCurrency=getPreferences(0).getString("display_currency","USD");if(!Arrays.asList(currencyCodes).contains(displayCurrency))displayCurrency="USD";configureNavigationBar();try{assets=new JSONArray(getPreferences(0).getString(PREF,"[]"));}catch(Exception ignored){} build(); refresh();}
   void save(){getPreferences(0).edit().putString(PREF,assets.toString()).apply();}
   void build(){ScrollView scroll=new ScrollView(this);
     scroll.setOnApplyWindowInsetsListener((view,insets)->{
@@ -72,7 +79,7 @@ public class MainActivity extends Activity {
   String key(JSONObject a){return a.optString("type")+":"+a.optString("id");}
   void render(){if(items==null)return;items.removeAllViews();double sum=0;boolean incomplete=false;
     for(int i=0;i<assets.length();i++){JSONObject a=assets.optJSONObject(i);if(a==null)continue;final int index=i;String k=key(a);Double price=prices.get(k);double qty=a.optDouble("quantity",0);String title=a.optString("name","Token");
-      String val=price==null?"Price unavailable":String.format(Locale.US,"$%,.4f",qty*price);if(price==null)incomplete=true;else sum+=qty*price;
+      String val=price==null?"Price unavailable":formatValue(qty*price);if(price==null)incomplete=true;else sum+=qty*price;
       LinearLayout row=new LinearLayout(this);row.setOrientation(1);row.setPadding(dp(12),dp(8),dp(12),dp(8));row.setBackgroundColor(cardColor());LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(8);items.addView(row,lp);
       LinearLayout titleRow=new LinearLayout(this);titleRow.setOrientation(0);titleRow.setGravity(Gravity.CENTER_VERTICAL);
       ImageView icon=new ImageView(this);int iconId;
@@ -90,7 +97,7 @@ public class MainActivity extends Activity {
       row.addView(titleRow);row.addView(label("Quantity: "+a.optString("quantity")+"   •   "+val,15));
       addButton(row,"Edit / Remove",()->editDialog(index));
     }
-    total.setText(String.format(Locale.US,"Known value: $%,.2f USD",sum));if(incomplete)total.append("\n(Excludes unpriced assets)");
+    total.setText("Known value: "+formatValue(sum)+" "+displayCurrency);if(incomplete)total.append("\n(Excludes unpriced assets)");
     applyTheme();
   }
   EditText input(String hint,String value){EditText e=new EditText(this);e.setSingleLine(true);e.setHint(hint);e.setText(value);return e;}
@@ -172,8 +179,11 @@ public class MainActivity extends Activity {
   }
   void refresh(){status.setText("Fetching prices…");new Thread(()->{
     StringBuilder notes=new StringBuilder();
-    try{JSONObject j=fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin-cash%2Cpi-network%2Ctether&vs_currencies=usd");
-      putPrice("BCH:bch",j.optJSONObject("bitcoin-cash"));putPrice("PI:pi",j.optJSONObject("pi-network"));putPrice("USDT:usdt",j.optJSONObject("tether"));notes.append("CoinGecko OK. ");
+    try{JSONObject j=fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin-cash%2Cpi-network%2Ctether&vs_currencies=usd%2Cmxn%2Cars%2Cvnd%2Cphp%2Cjpy%2Ccny");
+      putPrice("BCH:bch",j.optJSONObject("bitcoin-cash"));putPrice("PI:pi",j.optJSONObject("pi-network"));putPrice("USDT:usdt",j.optJSONObject("tether"));
+      JSONObject bchRates=j.optJSONObject("bitcoin-cash");
+      if(bchRates!=null){double bchUsd=bchRates.optDouble("usd",0);if(displayCurrency.equals("BCH"))currencyRate=bchUsd;else{String rateKey=displayCurrency.toLowerCase(Locale.US);double local=bchRates.optDouble(rateKey,0);if(bchUsd>0&&local>0)currencyRate=local/bchUsd;}}
+      notes.append("CoinGecko OK. ");
     }catch(Exception e){notes.append("CoinGecko unavailable. ");}
     int found=0,missing=0;
     // TokenStork's directory endpoint does not expose live venue prices.
