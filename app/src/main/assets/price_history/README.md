@@ -1,13 +1,16 @@
-# Bundled price history datasets
+# Bundled CashToken price history
 
-Place the historical daily price JSON files used by CashTrack in this directory:
+CashTrack bundles daily historical price datasets in this directory so the supported CashToken charts can display historical data without downloading the entire history at runtime.
 
-- `pi_usdt_daily.json`
-- `shibch_daily.json`
-- `furu_daily.json`
-- `paryonusd_daily.json`
-- `moriausd_daily.json`
+## Datasets
 
-Keep each dataset's source, retrieval date, price units, and timestamp convention documented. CashToken history from the Cauldron API is quoted in BCH satoshis; Pi history from an exchange is quoted in USDT. Missing trading days should remain missing rather than being filled with zero prices.
+- `shibch_daily.json` — SHIBCH
+- `furu_daily.json` — FURU
+- `paryonusd_daily.json` — ParyonUSD
+- `moriausd_daily.json` — Moria USD
 
-The JSON datasets have not been added yet; this directory is a placeholder for them.
+Each file contains a `history` array with `time` (Unix timestamp in seconds) and `avg`, `min`, and `max` prices quoted in BCH satoshis. CashTrack plots the `avg` value and converts timestamps to milliseconds for the chart.
+
+The app selects these bundled files by the asset's display name. CashTokens without a matching bundled dataset continue to use the live Cauldron indexer history endpoint when available.
+
+When updating a dataset, preserve its JSON structure, document the source and retrieval date, avoid duplicate timestamps, and leave missing trading days missing rather than filling them with zero prices. Historical data can contain outliers; review suspicious values before publishing updates.
