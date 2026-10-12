@@ -64,6 +64,7 @@ public class MainActivity extends Activity {
       addButton(row,"Edit / Remove",()->editDialog(index));
     }
     total.setText(String.format(Locale.US,"Known value: $%,.2f USD",sum));if(incomplete)total.append("\n(Excludes unpriced assets)");
+    applyTheme();
   }
   EditText input(String hint,String value){EditText e=new EditText(this);e.setSingleLine(true);e.setHint(hint);e.setText(value);return e;}
   void addAssetDialog(){String[] types={"BCH","PI","USDT","CashToken"};new AlertDialog.Builder(this).setTitle("Choose asset").setItems(types,(d,which)->assetForm(-1,types[which])).show();}
