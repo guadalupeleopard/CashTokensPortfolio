@@ -182,7 +182,7 @@ public class MainActivity extends Activity {
     try{JSONObject j=fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin-cash%2Cpi-network%2Ctether&vs_currencies=usd%2Cmxn%2Cars%2Cvnd%2Cphp%2Cjpy%2Ccny");
       putPrice("BCH:bch",j.optJSONObject("bitcoin-cash"));putPrice("PI:pi",j.optJSONObject("pi-network"));putPrice("USDT:usdt",j.optJSONObject("tether"));
       JSONObject bchRates=j.optJSONObject("bitcoin-cash");
-      if(bchRates!=null){double bchUsd=bchRates.optDouble("usd",0);if(displayCurrency.equals("BCH"))currencyRate=bchUsd;else{String rateKey=displayCurrency.toLowerCase(Locale.US);double local=bchRates.optDouble(rateKey,0);if(bchUsd>0&&local>0)currencyRate=local/bchUsd;}}
+      if(bchRates!=null){double bchUsd=bchRates.optDouble("usd",0);if(displayCurrency.equals("BCH"))currencyRate=bchUsd;else{String rateKey=displayCurrency.toLowerCase(Locale.US);double local=bchRates.optDouble(rateKey,0);if(bchUsd>0&&local>0)currencyRate=local/bchUsd;else if(displayCurrency.equals("USD"))currencyRate=1.0;}}
       notes.append("CoinGecko OK. ");
     }catch(Exception e){notes.append("CoinGecko unavailable. ");}
     int found=0,missing=0;
