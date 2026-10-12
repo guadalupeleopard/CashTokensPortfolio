@@ -267,8 +267,35 @@ public class MainActivity extends Activity {
       // Draw the pie's darker extruded side in layers to create a 3D thickness effect.
       for(int layer=(int)depth;layer>=1;layer--){float offset=layer;float start=-90f;for(int i=0;i<values.size();i++){float sweep=(float)(values.get(i)/total*360d);paint.setColor(shade(colors.get(i),0.52f));paint.setStyle(android.graphics.Paint.Style.FILL);canvas.drawArc(oval,start,sweep,false,paint);canvas.drawArc(oval,start,sweep,true,paint);start+=sweep;}canvas.save();canvas.translate(0,offset);start=-90f;for(int i=0;i<values.size();i++){float sweep=(float)(values.get(i)/total*360d);paint.setColor(shade(colors.get(i),0.52f));canvas.drawArc(oval,start,sweep,true,paint);start+=sweep;}canvas.restore();}
       float start=-90f;
-      for(int i=0;i<values.size();i++){float sweep=(float)(values.get(i)/total*360d);paint.setColor(colors.get(i));paint.setStyle(android.graphics.Paint.Style.FILL);if(i==selected){float mid=(float)Math.toRadians(start+sweep/2);canvas.save();canvas.translate((float)Math.cos(mid)*dp(7),(float)Math.sin(mid)*dp(5));canvas.drawArc(oval,start,sweep,true,paint);canvas.restore();}else canvas.drawArc(oval,start,sweep,true,paint);start+=sweep;}
-      if(selected>=0&&selected<values.size()){paint.setColor(textColor());paint.setTextAlign(android.graphics.Paint.Align.CENTER);paint.setTextSize(dp(14));canvas.drawText(String.format(Locale.US,"%.2f%%",values.get(selected)/total*100),getWidth()/2f,getHeight()-dp(2),paint);}
+      for(int i=0;i<values.size();i++){
+        float sweep=(float)(values.get(i)/total*360d);
+        paint.setColor(colors.get(i));paint.setStyle(android.graphics.Paint.Style.FILL);
+        if(i==selected){
+          // Lift the selected slice diagonally upward and outward, including its
+          // dark extruded edge, so the whole piece visibly separates from the pie.
+          float mid=(float)Math.toRadians(start+sweep/2);
+          float dx=(float)Math.cos(mid)*dp(13);
+          float dy=(float)Math.sin(mid)*dp(9)-dp(13);
+          for(int layer=(int)depth;layer>=1;layer--){
+            canvas.save();canvas.translate(dx,dy+layer);
+            paint.setColor(shade(colors.get(i),0.42f));
+            canvas.drawArc(oval,start,sweep,true,paint);
+            canvas.restore();
+          }
+          canvas.save();canvas.translate(dx,dy);
+          paint.setColor(colors.get(i));
+          canvas.drawArc(oval,start,sweep,true,paint);
+          canvas.restore();
+        }else{
+          paint.setColor(colors.get(i));
+          canvas.drawArc(oval,start,sweep,true,paint);
+        }
+        start+=sweep;
+      }
+      if(selected>=0&&selected<values.size()){
+        paint.setColor(textColor());paint.setTextAlign(android.graphics.Paint.Align.CENTER);paint.setTextSize(dp(14));
+        canvas.drawText(String.format(Locale.US,"%.2f%%",values.get(selected)/total*100),getWidth()/2f,getHeight()-dp(2),paint);
+      }
     }
     @Override public boolean onTouchEvent(android.view.MotionEvent event){
       if(event.getAction()!=MotionEvent.ACTION_UP)return true;
