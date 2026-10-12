@@ -55,7 +55,7 @@ public class MainActivity extends Activity {
       else if("USDT".equalsIgnoreCase(assetType))iconId=R.drawable.ic_asset_usdt;
       else iconId=R.drawable.ic_asset_cashtoken;
       LinearLayout.LayoutParams iconLp=new LinearLayout.LayoutParams(dp(22),dp(22));iconLp.rightMargin=dp(7);
-      icon.setImageResource(iconId);icon.setScaleType(ImageView.ScaleType.FIT_CENTER);titleRow.addView(icon,iconLp);if("CashToken".equalsIgnoreCase(assetType))loadCashTokenIcon(icon,a.optString("id"));
+      icon.setImageResource(iconId);icon.setScaleType(ImageView.ScaleType.FIT_CENTER);titleRow.addView(icon,iconLp);if("CashToken".equalsIgnoreCase(assetType))loadCashTokenIcon(icon,a.optString("id"),a.optString("icon_mode","auto"),a.optString("icon_url",""));
       TextView assetTitle=label(title+" ("+assetType+")",18);assetTitle.setPadding(dp(2),dp(8),dp(4),dp(8));titleRow.addView(assetTitle);
       row.addView(titleRow);row.addView(label("Quantity: "+a.optString("quantity")+"   •   "+val,15));
       addButton(row,"Edit / Remove",()->editDialog(index));
@@ -68,6 +68,25 @@ public class MainActivity extends Activity {
   void assetForm(int index,String type){JSONObject old=index>=0?assets.optJSONObject(index):new JSONObject();LinearLayout box=new LinearLayout(this);box.setPadding(dp(18),0,dp(18),0);box.setOrientation(1);
     EditText name=input("Token name",old.optString("name",type.equals("CashToken")?"":type));EditText id=input(type.equals("CashToken")?"CashToken category ID (64 hex chars)":"Asset ID",old.optString("id",type.toLowerCase(Locale.US)));
     EditText qty=input("Quantity",old.optString("quantity",""));qty.setInputType(8194);box.addView(name);if(type.equals("CashToken"))box.addView(id);box.addView(qty);
+    final String[] iconModes={"auto","default","custom"};
+    final String[] iconLabels={"Automatic (known token / BCMR icon)","Default CashToken icon","Custom image URL"};
+    final String[] selectedIconMode={old.optString("icon_mode","auto")};
+    EditText iconUrl=input("Custom icon URL (https://…)",old.optString("icon_url",""));
+    Spinner iconChoice=new Spinner(this);
+    ArrayAdapter<String> iconAdapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_item,iconLabels);
+    iconAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);iconChoice.setAdapter(iconAdapter);
+    int selectedIndex=0;for(int m=0;m<iconModes.length;m++)if(iconModes[m].equals(selectedIconMode[0]))selectedIndex=m;
+    iconChoice.setSelection(selectedIndex);
+    TextView iconHint=label("Icon choice",14);
+    if(type.equals("CashToken")){box.addView(iconHint);box.addView(iconChoice);if(selectedIndex==2)box.addView(iconUrl);
+      iconChoice.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
+        public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long rowId){
+          selectedIconMode[0]=iconModes[position];
+          if(position==2){if(iconUrl.getParent()==null)box.addView(iconUrl);}else if(iconUrl.getParent()!=null)box.removeView(iconUrl);
+        }
+        public void onNothingSelected(android.widget.AdapterView<?> parent){}
+      });
+    }
     if(type.equals("CashToken")){
       final String[] lastLookup={""};
       id.addTextChangedListener(new TextWatcher(){
@@ -92,7 +111,13 @@ public class MainActivity extends Activity {
         public void afterTextChanged(Editable s){}
       });
     }
-    new AlertDialog.Builder(this).setTitle((index>=0?"Edit ":"Add ")+type).setView(box).setNegativeButton("Cancel",null).setPositiveButton("Save",(d,w)->{try{String q=qty.getText().toString().trim();BigDecimal quantity=new BigDecimal(q);if(quantity.signum()<0)throw new Exception("Quantity cannot be negative");String identifier=type.equals("CashToken")?id.getText().toString().trim().toLowerCase(Locale.US):type.toLowerCase(Locale.US);if(type.equals("CashToken")&&!identifier.matches("[a-f0-9]{64}"))throw new Exception("CashToken category ID must be 64 hexadecimal characters");if(name.getText().toString().trim().isEmpty()||"Looking up token name…".contentEquals(name.getText()))throw new Exception("Enter a token name or wait for the token lookup to finish");JSONObject obj=new JSONObject();obj.put("type",type);obj.put("name",name.getText().toString().trim());obj.put("id",identifier);obj.put("quantity",quantity.toPlainString());if(index<0)assets.put(obj);else assets.put(index,obj);save();render();refresh();}catch(Exception e){new AlertDialog.Builder(this).setMessage(e.getMessage()).setPositiveButton("OK",null).show();}}).show();
+    new AlertDialog.Builder(this).setTitle((index>=0?"Edit ":"Add ")+type).setView(box).setNegativeButton("Cancel",null).setPositiveButton("Save",(d,w)->{try{String q=qty.getText().toString().trim();BigDecimal quantity=new BigDecimal(q);if(quantity.signum()<0)throw new Exception("Quantity cannot be negative");String identifier=type.equals("CashToken")?id.getText().toString().trim().toLowerCase(Locale.US):type.toLowerCase(Locale.US);if(type.equals("CashToken")&&!identifier.matches("[a-f0-9]{64}"))throw new Exception("CashToken category ID must be 64 hexadecimal characters");if(name.getText().toString().trim().isEmpty()||"Looking up token name…".contentEquals(name.getText()))throw new Exception("Enter a token name or wait for the token lookup to finish");JSONObject obj=new JSONObject();obj.put("type",type);obj.put("name",name.getText().toString().trim());obj.put("id",identifier);obj.put("quantity",quantity.toPlainString());
+      if(type.equals("CashToken")){
+        String mode=selectedIconMode[0];String customUrl=iconUrl.getText().toString().trim();
+        if("custom".equals(mode)&&!(customUrl.startsWith("https://")||customUrl.startsWith("http://")))throw new Exception("Enter a valid custom icon URL beginning with https:// or http://");
+        obj.put("icon_mode",mode);obj.put("icon_url","custom".equals(mode)?customUrl:"");
+      }
+      if(index<0)assets.put(obj);else assets.put(index,obj);save();render();refresh();}catch(Exception e){new AlertDialog.Builder(this).setMessage(e.getMessage()).setPositiveButton("OK",null).show();}}).show();
   }
 
   String extractTokenName(Object value){
@@ -181,7 +206,30 @@ public class MainActivity extends Activity {
     }
     return null;
   }
-  void loadCashTokenIcon(ImageView target,String category){
+  android.graphics.Bitmap downloadIconBitmap(String imageUrl)throws Exception{
+    if(imageUrl.startsWith("ipfs://")){String path=imageUrl.substring(7);if(path.startsWith("ipfs/"))path=path.substring(5);imageUrl="https://ipfs.io/ipfs/"+path;}
+    if(!(imageUrl.startsWith("https://")||imageUrl.startsWith("http://")))return null;
+    HttpURLConnection conn=(HttpURLConnection)new URL(imageUrl).openConnection();conn.setConnectTimeout(10000);conn.setReadTimeout(10000);conn.setInstanceFollowRedirects(true);conn.setRequestProperty("User-Agent","CashTokensPortfolio/1.2");
+    try(InputStream in=conn.getInputStream()){
+      ByteArrayOutputStream bytes=new ByteArrayOutputStream();byte[] buf=new byte[4096];int n;
+      while((n=in.read(buf))!=-1&&bytes.size()<2097152)bytes.write(buf,0,n);
+      byte[] imageBytes=bytes.toByteArray();android.graphics.Bitmap bitmap=BitmapFactory.decodeByteArray(imageBytes,0,imageBytes.length);
+      if(bitmap==null){String svgText=new String(imageBytes,"UTF-8").replace("\\uFEFF","").trim();if(svgText.toLowerCase(Locale.US).contains("<svg")){SVG svg=SVG.getFromString(svgText);Bitmap rendered=Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888);Canvas canvas=new Canvas(rendered);svg.renderToCanvas(canvas,new android.graphics.RectF(0,0,96,96));bitmap=rendered;}}
+      return bitmap;
+    }finally{conn.disconnect();}
+  }
+  void loadCashTokenIcon(ImageView target,String category,String iconMode,String customIconUrl){
+    if("default".equals(iconMode)){target.setImageResource(R.drawable.ic_asset_cashtoken);return;}
+    if("custom".equals(iconMode)){
+      if(customIconUrl==null||!(customIconUrl.startsWith("https://")||customIconUrl.startsWith("http://")))return;
+      String cacheKey="custom:"+customIconUrl;
+      android.graphics.Bitmap customCached=cashTokenIconCache.get(cacheKey);if(customCached!=null){target.setImageBitmap(customCached);return;}
+      synchronized(iconRequests){if(iconRequests.contains(cacheKey))return;iconRequests.add(cacheKey);}
+      new Thread(()->{android.graphics.Bitmap bitmap=null;try{bitmap=downloadIconBitmap(customIconUrl);}catch(Exception ignored){}finally{synchronized(iconRequests){iconRequests.remove(cacheKey);}}
+        if(bitmap!=null){cashTokenIconCache.put(cacheKey,bitmap);runOnUiThread(()->{if(!isFinishing())render();});}
+      }).start();return;
+    }
+
     if(category==null||!category.matches("(?i)[a-f0-9]{64}"))return;
     android.graphics.Bitmap cached=cashTokenIconCache.get(category);if(cached!=null){target.setImageBitmap(cached);return;}
     synchronized(iconRequests){if(iconRequests.contains(category))return;iconRequests.add(category);}
