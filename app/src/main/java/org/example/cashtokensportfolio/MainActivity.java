@@ -23,8 +23,6 @@ public class MainActivity extends Activity {
   int themeMode=0; // 0=Day, 1=Dark, 2=Bitcoin Cash
   boolean chartPageOpen=false;
   long lastMainBackPress=0;
-  final Handler mainBackHandler=new Handler(Looper.getMainLooper());
-  Runnable pendingClosePrompt;
   String displayCurrency="USD";
   double currencyRate=1.0;
   final String[] currencyCodes={"USD","BCH","MXN","ARS","VND","PHP","JPY","CNY"};
@@ -148,23 +146,11 @@ public class MainActivity extends Activity {
     long now=System.currentTimeMillis();
     if(now-lastMainBackPress<=1800){
       lastMainBackPress=0;
-      if(pendingClosePrompt!=null)mainBackHandler.removeCallbacks(pendingClosePrompt);
-      pendingClosePrompt=null;
       finish();
       return;
     }
     lastMainBackPress=now;
-    Toast.makeText(this,"Press Back again to close, or wait to confirm.",Toast.LENGTH_SHORT).show();
-    pendingClosePrompt=()->{
-      pendingClosePrompt=null;
-      lastMainBackPress=0;
-      if(isFinishing()||chartPageOpen)return;
-      new AlertDialog.Builder(this).setTitle("Close CashTrack?")
-        .setMessage("Do you want to close the application?")
-        .setPositiveButton("Close",(dialog,which)->finish())
-        .setNegativeButton("Cancel",null).show();
-    };
-    mainBackHandler.postDelayed(pendingClosePrompt,1900);
+    Toast.makeText(this,"Press Back again to close CashTrack.",Toast.LENGTH_SHORT).show();
   }
 
   void build(){chartPageOpen=false;ScrollView scroll=new ScrollView(this);
