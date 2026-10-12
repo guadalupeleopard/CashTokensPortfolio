@@ -312,15 +312,20 @@ public class MainActivity extends Activity {
           Object result=fetchAny("https://indexer.riften.net/cauldron/price/"+token+"/history?start=0&end="+now+"&stepsize=86400");
           if(result instanceof JSONObject){JSONArray points=((JSONObject)result).optJSONArray("history");if(points!=null)for(int i=0;i<points.length();i++){JSONObject p=points.optJSONObject(i);if(p==null)continue;long time=p.optLong("time",0);double sats=p.optDouble("avg",Double.NaN);if(time>0&&Double.isFinite(sats)&&sats>=0){ts.add(time*1000L);ps.add(sats);}}}
         }else{
-          String id="bch-bitcoin-cash";String type=asset.optString("type","").toUpperCase(Locale.US);
-          if(type.equals("PI"))id="pi-pi-network";else if(type.equals("USDT"))id="usdt-tether";
-          java.text.SimpleDateFormat fmt=new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.US);fmt.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
-          Object response=fetchAny("https://api.coinpaprika.com/v1/coins/"+id+"/ohlcv/historical?start=2010-01-01&end="+fmt.format(new java.util.Date()));
-          JSONArray points=response instanceof JSONArray?(JSONArray)response:null;
-          if(response instanceof JSONObject){JSONObject data=(JSONObject)response;points=data.optJSONArray("prices");if(points==null)points=data.optJSONArray("data");}
-          if(points!=null)for(int i=0;i<points.length();i++){JSONObject p=points.optJSONObject(i);if(p!=null){String date=p.optString("time_open",p.optString("time_close",""));double price=p.optDouble("close",Double.NaN);if(date.length()>=10&&Double.isFinite(price)&&price>=0){try{java.util.Date parsed=fmt.parse(date.substring(0,10));if(parsed!=null){ts.add(parsed.getTime());ps.add(price);}}catch(Exception ignored){}}}}
+          String id="bitcoin-cash";String type=asset.optString("type","").toUpperCase(Locale.US);
+          if(type.equals("PI"))id="pi-network";else if(type.equals("USDT"))id="tether";
+          // CoinPaprika's free historical OHLCV tier only allows the last 24 hours.
+          // Use CoinGecko market_chart for long-range daily history instead.
+          Object response=fetchAny("https://api.coingecko.com/api/v3/coins/"+id+"/market_chart?vs_currency=usd&days=max");
+          JSONArray points=null;
+          if(response instanceof JSONObject)points=((JSONObject)response).optJSONArray("prices");
+          if(points!=null)for(int i=0;i<points.length();i++){
+            JSONArray p=points.optJSONArray(i);if(p==null||p.length()<2)continue;
+            long time=p.optLong(0,0);double price=p.optDouble(1,Double.NaN);
+            if(time>0&&Double.isFinite(price)&&price>=0){ts.add(time);ps.add(price);}
+          }
         }
-      }catch(Exception e){failure="Could not load history. The provider may be unavailable or rate-limiting requests.";}
+      }catch(Exception e){failure="Could not load price history ("+e.getMessage()+"). Check your internet connection or try again later.";}
       final String err=failure;
       runOnUiThread(()->{
         timestamps.addAll(ts);priceValues.addAll(ps);
