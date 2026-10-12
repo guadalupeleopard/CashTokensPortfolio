@@ -307,10 +307,19 @@ public class MainActivity extends Activity {
     new Thread(()->{
       ArrayList<Long> ts=new ArrayList<>();ArrayList<Double> ps=new ArrayList<>();String failure=null;
       try{
+        String sourceLabel="";
         if("CashToken".equalsIgnoreCase(asset.optString("type"))){
-          String token=asset.optString("id").toLowerCase(Locale.US);long now=System.currentTimeMillis()/1000L;
-          Object result=fetchAny("https://indexer.riften.net/cauldron/price/"+token+"/history?start=1&end="+now+"&stepsize=86400");
-          if(result instanceof JSONObject){JSONArray points=((JSONObject)result).optJSONArray("history");if(points!=null)for(int i=0;i<points.length();i++){JSONObject p=points.optJSONObject(i);if(p==null)continue;long time=p.optLong("time",0);double sats=p.optDouble("avg",Double.NaN);if(time>0&&Double.isFinite(sats)&&sats>=0){ts.add(time*1000L);ps.add(sats);}}}
+          String bundledFile=bundledHistoryFile(asset);
+          if(bundledFile!=null){
+            loadBundledCashTokenHistory(bundledFile,ts,ps);
+            if(!ts.isEmpty())sourceLabel=" • bundled history";
+          }
+          if(ts.isEmpty()){
+            String token=asset.optString("id").toLowerCase(Locale.US);long now=System.currentTimeMillis()/1000L;
+            Object result=fetchAny("https://indexer.riften.net/cauldron/price/"+token+"/history?start=1&end="+now+"&stepsize=86400");
+            if(result instanceof JSONObject){JSONArray points=((JSONObject)result).optJSONArray("history");if(points!=null)for(int i=0;i<points.length();i++){JSONObject p=points.optJSONObject(i);if(p==null)continue;long time=p.optLong("time",0);double sats=p.optDouble("avg",Double.NaN);if(time>0&&Double.isFinite(sats)&&sats>=0){ts.add(time*1000L);ps.add(sats);}}}
+            if(!ts.isEmpty())sourceLabel=" • live Cauldron API";
+          }
         }else{
           String symbol="BCHUSDT";String type=asset.optString("type","").toUpperCase(Locale.US);
           if(type.equals("PI"))symbol="PIUSDT";
@@ -331,16 +340,36 @@ public class MainActivity extends Activity {
         }
       }catch(Exception e){failure="Could not load price history: "+e.getMessage()+". The selected provider may be unavailable or the asset pair may not exist.";}
       final String err=failure;
+      final String source=sourceLabel;
       runOnUiThread(()->{
         timestamps.addAll(ts);priceValues.addAll(ps);
         if(priceValues.isEmpty()){statusText.setText(err==null?"No historical price data is available for this asset.":err);return;}
-        statusText.setText("Loaded "+priceValues.size()+" historical points"+("CashToken".equalsIgnoreCase(asset.optString("type"))?" • BCH satoshis":" • USD"));
+        statusText.setText("Loaded "+priceValues.size()+" historical points"+("CashToken".equalsIgnoreCase(asset.optString("type"))?" • BCH satoshis"+source:" • USD"));
         graph[0]=new HistoryGraph(this,timestamps,priceValues,interval[0]);graphHolder.addView(graph[0],new FrameLayout.LayoutParams(-1,-1));
         redraw[0]=()->{if(graph[0]!=null){graph[0].interval=interval[0];graph[0].invalidate();}};
         redraw[0].run();applyThemeTo(page);
       });
     }).start();
     setContentView(scroll);applyThemeTo(page);
+  }
+  String bundledHistoryFile(JSONObject asset){
+    String name=asset.optString("name","").toLowerCase(Locale.US).replaceAll("[^a-z0-9]","");
+    if(name.equals("shibch"))return "shibch_daily.json";
+    if(name.equals("furu"))return "furu_daily.json";
+    if(name.equals("paryonusd")||name.equals("paryon")||name.equals("pusd"))return "paryonusd_daily.json";
+    if(name.equals("moriausd")||name.equals("moria")||name.equals("musd"))return "moriausd_daily.json";
+    return null;
+  }
+  void loadBundledCashTokenHistory(String file,ArrayList<Long> timestamps,ArrayList<Double> prices)throws Exception{
+    byte[] buffer=new byte[8192];ByteArrayOutputStream bytes=new ByteArrayOutputStream();
+    try(InputStream input=getAssets().open("price_history/"+file)){int count;while((count=input.read(buffer))!=-1)bytes.write(buffer,0,count);}
+    JSONObject root=new JSONObject(new String(bytes.toByteArray(),"UTF-8"));
+    JSONArray points=root.optJSONArray("history");if(points==null)return;
+    for(int i=0;i<points.length();i++){
+      JSONObject point=points.optJSONObject(i);if(point==null)continue;
+      long time=point.optLong("time",0);double price=point.optDouble("avg",Double.NaN);
+      if(time>0&&Double.isFinite(price)&&price>=0){timestamps.add(time*1000L);prices.add(price);}
+    }
   }
   class HistoryGraph extends View{
     final ArrayList<Long> times;final ArrayList<Double> values;String interval;
