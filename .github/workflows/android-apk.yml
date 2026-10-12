@@ -28,7 +28,7 @@ jobs:
           set -euo pipefail
           SDKMANAGER="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}" -type f -name sdkmanager | head -n 1)"
           if [ -z "$SDKMANAGER" ]; then
-            echo "sdkmanager was not found in the Android SDK installation."
+            echo "::error::sdkmanager was not found in the Android SDK installation."
             exit 1
           fi
           yes | "$SDKMANAGER" --licenses >/dev/null || true
@@ -67,21 +67,21 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish CashTrack debug 1.0.1 release
+      - name: Publish CashTrack debug 1.0.2 release
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="CashTrackDebug1.0.1"
+          TAG="CashTrackDebug1.0.2"
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists; leaving it unchanged."
             exit 0
           fi
           gh release create "$TAG" \
             app/build/outputs/apk/debug/CashTrack-debug.apk#CashTrack-debug.apk \
-            --title "CashTrack debug 1.0.1" \
-            --notes "CashTrack debug 1.0.1. Includes the updated About release version and Bitcoin Cash/CashTokens donation addresses. Debug APK signed with the existing CashTrack signing key." \
+            --title "CashTrack debug 1.0.2" \
+            --notes "CashTrack debug 1.0.2. Includes the updated historical price trend arrow sizing. Debug APK signed with the existing CashTrack signing key." \
             --prerelease \
             --target "$GITHUB_SHA"
