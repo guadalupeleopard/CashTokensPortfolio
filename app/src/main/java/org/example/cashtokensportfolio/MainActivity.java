@@ -151,7 +151,7 @@ public class MainActivity extends Activity {
     LinearLayout header=new LinearLayout(this);header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);ImageView appLogo=new ImageView(this);appLogo.setImageResource(R.drawable.cashtrack_icon);appLogo.setScaleType(ImageView.ScaleType.FIT_CENTER);LinearLayout.LayoutParams appLogoLp=new LinearLayout.LayoutParams(dp(48),dp(48));appLogoLp.rightMargin=dp(12);header.addView(appLogo,appLogoLp);TextView heading=label("CashTokens Portfolio",26);LinearLayout.LayoutParams headingLp=new LinearLayout.LayoutParams(0,-2,1f);header.addView(heading,headingLp);chartButton=new Button(this);chartButton.setText("▥");chartButton.setTextSize(22);chartButton.setMinWidth(0);chartButton.setMinimumWidth(0);chartButton.setPadding(dp(8),dp(4),dp(8),dp(4));chartButton.setContentDescription("Open portfolio chart");header.addView(chartButton);chartButton.setOnClickListener(v->showChart());themeButton=new Button(this);themeButton.setText("☰");themeButton.setTextSize(22);themeButton.setMinWidth(0);themeButton.setMinimumWidth(0);themeButton.setPadding(dp(10),dp(4),dp(10),dp(4));themeButton.setContentDescription("Open menu");header.addView(themeButton);themeButton.setOnClickListener(v->openMenu());root.addView(header);root.addView(label("Watch-only • Stored on this device",13));total=label("Total: —",23);root.addView(total);status=label("Prices not loaded",12);root.addView(status);
     addButton(root,"+ Add asset",this::addAssetDialog);addButton(root,"Refresh market prices",this::refresh);items=new LinearLayout(this);items.setOrientation(1);root.addView(items);render();}
 
-  int chartAssetColor(JSONObject a){
+  int chartAssetPreferredColor(JSONObject a){
     String type=a.optString("type","").toUpperCase(Locale.US);
     String name=a.optString("name","").toLowerCase(Locale.US);
     if(type.equals("BCH")||name.contains("bitcoin cash"))return Color.rgb(12,193,142);
@@ -161,10 +161,42 @@ public class MainActivity extends Activity {
     if(name.contains("moria")||name.contains("musd"))return Color.rgb(42,119,210);
     if(name.contains("ethereum")||name.equals("eth"))return Color.rgb(98,126,234);
     if(name.contains("bitcoin")||name.equals("btc"))return Color.rgb(247,147,26);
-    // Stable, asset-specific fallback color for CashTokens and other assets.
     int hash=(a.optString("type","")+":"+a.optString("id","")+":"+a.optString("name","")).hashCode();
-    float hue=Math.floorMod(hash,360);
-    return Color.HSVToColor(new float[]{hue,0.72f,0.88f});
+    return Color.HSVToColor(new float[]{Math.floorMod(hash,360),0.72f,0.88f});
+  }
+  boolean isBchChartAsset(JSONObject a){
+    return a.optString("type","").equalsIgnoreCase("BCH")||a.optString("name","").toLowerCase(Locale.US).contains("bitcoin cash");
+  }
+  boolean isPiChartAsset(JSONObject a){
+    String type=a.optString("type","");String name=a.optString("name","").toLowerCase(Locale.US);
+    return type.equalsIgnoreCase("PI")||name.equals("pi")||name.contains("pi network");
+  }
+  int chartAssetColor(JSONObject a, HashSet<Integer> usedColors){
+    int preferred=chartAssetPreferredColor(a);
+    // Always preserve the requested signature colors for Bitcoin Cash and Pi,
+    // regardless of the order in which assets appear in the portfolio.
+    int bchGreen=Color.rgb(12,193,142), piPurple=Color.rgb(123,78,200);
+    if(!usedColors.contains(preferred)
+        && (isBchChartAsset(a)||preferred!=bchGreen)
+        && (isPiChartAsset(a)||preferred!=piPurple)) return preferred;
+    int[][] alternatives={
+      {Color.rgb(247,147,26),Color.rgb(230,126,34),Color.rgb(255,193,7),Color.rgb(190,100,35)},
+      {Color.rgb(42,119,210),Color.rgb(52,152,219),Color.rgb(41,128,185),Color.rgb(0,188,212)},
+      {Color.rgb(239,91,52),Color.rgb(231,76,60),Color.rgb(192,57,43),Color.rgb(255,112,67)},
+      {Color.rgb(98,126,234),Color.rgb(103,58,183),Color.rgb(156,39,176),Color.rgb(121,85,72)},
+      {Color.rgb(38,161,123),Color.rgb(46,204,113),Color.rgb(0,150,136),Color.rgb(139,195,74)},
+      {Color.rgb(233,30,99),Color.rgb(0,150,136),Color.rgb(63,81,181),Color.rgb(121,134,203)}
+    };
+    int group=isBchChartAsset(a)?4:isPiChartAsset(a)?3:Math.floorMod((a.optString("type","")+a.optString("name","")).hashCode(),alternatives.length);
+    for(int c:alternatives[group]) if(!usedColors.contains(c)&&c!=bchGreen&&c!=piPurple)return c;
+    int[] palette={Color.rgb(255,193,7),Color.rgb(0,188,212),Color.rgb(233,30,99),Color.rgb(103,58,183),Color.rgb(121,85,72),Color.rgb(96,125,139),Color.rgb(205,220,57),Color.rgb(255,87,34),Color.rgb(63,81,181),Color.rgb(0,150,136),Color.rgb(156,39,176),Color.rgb(121,134,203)};
+    for(int c:palette) if(!usedColors.contains(c)&&c!=bchGreen&&c!=piPurple)return c;
+    // For very large portfolios, generate additional distinct hues as needed.
+    for(int hue=0;hue<360;hue++){
+      int c=Color.HSVToColor(new float[]{hue,0.78f,0.92f});
+      if(!usedColors.contains(c)&&c!=bchGreen&&c!=piPurple)return c;
+    }
+    return Color.WHITE;
   }
   void showChart(){
     ScrollView scroll=new ScrollView(this);
@@ -174,7 +206,8 @@ public class MainActivity extends Activity {
     TextView title=label("Portfolio Chart",23);LinearLayout.LayoutParams titleLp=new LinearLayout.LayoutParams(0,-2,1f);titleLp.leftMargin=dp(12);header.addView(title,titleLp);page.addView(header);
     page.addView(label("3D asset allocation by current known value",14));
     ArrayList<String> names=new ArrayList<>();ArrayList<Double> values=new ArrayList<>();ArrayList<Integer> colors=new ArrayList<>();double sum=0;
-    for(int i=0;i<assets.length();i++){JSONObject a=assets.optJSONObject(i);if(a==null)continue;Double price=prices.get(key(a));double qty=a.optDouble("quantity",0);if(price==null||!Double.isFinite(price)||price<0||qty<=0)continue;double value=qty*price;if(!Double.isFinite(value)||value<=0)continue;names.add(a.optString("name","Asset")+" ("+a.optString("type","")+")");values.add(value);colors.add(chartAssetColor(a));sum+=value;}
+    HashSet<Integer> usedChartColors=new HashSet<>();
+    for(int i=0;i<assets.length();i++){JSONObject a=assets.optJSONObject(i);if(a==null)continue;Double price=prices.get(key(a));double qty=a.optDouble("quantity",0);if(price==null||!Double.isFinite(price)||price<0||qty<=0)continue;double value=qty*price;if(!Double.isFinite(value)||value<=0)continue;names.add(a.optString("name","Asset")+" ("+a.optString("type","")+")");values.add(value);int assetColor=chartAssetColor(a,usedChartColors);colors.add(assetColor);usedChartColors.add(assetColor);sum+=value;}
     if(values.isEmpty()){TextView empty=label("No priced assets with a positive value are available to chart yet. Add assets and refresh market prices, then return here.",16);page.addView(empty);setContentView(scroll);applyThemeTo(page);return;}
     final double chartTotal=sum;
     PieChartView pie=new PieChartView(this,values,colors,chartTotal);LinearLayout.LayoutParams pieLp=new LinearLayout.LayoutParams(-1,dp(300));pieLp.topMargin=dp(8);page.addView(pie,pieLp);
