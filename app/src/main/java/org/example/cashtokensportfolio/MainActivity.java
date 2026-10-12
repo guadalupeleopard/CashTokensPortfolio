@@ -22,6 +22,7 @@ public class MainActivity extends Activity {
   LinearLayout root, items; TextView total, status; Button themeButton, chartButton; JSONArray assets = new JSONArray(); int selectedChartSlice=-1;
   int themeMode=0; // 0=Day, 1=Dark, 2=Bitcoin Cash
   boolean chartPageOpen=false;
+  boolean assetHistoryOpen=false;
   long lastMainBackPress=0;
   String displayCurrency="USD";
   double currencyRate=1.0;
@@ -142,6 +143,7 @@ public class MainActivity extends Activity {
   @Override public void onCreate(Bundle b){super.onCreate(b);themeMode=getPreferences(0).getInt("theme_mode",0);displayCurrency=getPreferences(0).getString("display_currency","USD");if(!Arrays.asList(currencyCodes).contains(displayCurrency))displayCurrency="USD";configureNavigationBar();try{assets=new JSONArray(getPreferences(0).getString(PREF,"[]"));}catch(Exception ignored){} build(); refresh();}
   void save(){getPreferences(0).edit().putString(PREF,assets.toString()).apply();}
   @Override public void onBackPressed(){
+    if(assetHistoryOpen){assetHistoryOpen=false;showChart();return;}
     if(chartPageOpen){build();return;}
     long now=System.currentTimeMillis();
     if(now-lastMainBackPress<=1800){
@@ -153,7 +155,7 @@ public class MainActivity extends Activity {
     Toast.makeText(this,"Press Back again to close CashTrack.",Toast.LENGTH_SHORT).show();
   }
 
-  void build(){chartPageOpen=false;ScrollView scroll=new ScrollView(this);
+  void build(){chartPageOpen=false;assetHistoryOpen=false;ScrollView scroll=new ScrollView(this);
     scroll.setOnApplyWindowInsetsListener((view,insets)->{
       int bottom;
       if(Build.VERSION.SDK_INT>=30)bottom=insets.getInsets(WindowInsets.Type.navigationBars()).bottom;
@@ -276,10 +278,77 @@ public class MainActivity extends Activity {
     TextView instruction=label("Tap a 3D slice or an asset below. Both selections stay synchronized.",13);page.addView(instruction);
     ArrayList<LinearLayout> chartRows=new ArrayList<>();
     final Runnable[] syncRows={()->{for(int j=0;j<chartRows.size();j++){chartRows.get(j).setBackgroundColor(j==pie.selected?buttonColor():pageColor());}}};
-    for(int i=0;i<names.size();i++){final int index=i;LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(8),dp(5),dp(8),dp(5));row.setBackgroundColor(pageColor());View swatch=new View(this);swatch.setBackgroundColor(colors.get(i));LinearLayout.LayoutParams swatchLp=new LinearLayout.LayoutParams(dp(14),dp(14));swatchLp.rightMargin=dp(10);row.addView(swatch,swatchLp);TextView name=label(names.get(i),15);LinearLayout.LayoutParams nameLp=new LinearLayout.LayoutParams(0,-2,1f);row.addView(name,nameLp);TextView percent=label(String.format(Locale.US,"%.2f%%",values.get(i)/chartTotal*100),15);row.addView(percent);row.setOnClickListener(v->{pie.setSelected(index);syncRows[0].run();selected.setText(names.get(index)+"\nValue: "+formatValue(values.get(index))+"\nPortfolio share: "+String.format(Locale.US,"%.2f%%",values.get(index)/chartTotal*100));});chartRows.add(row);page.addView(row);View divider=new View(this);divider.setBackgroundColor(themeMode==1?Color.DKGRAY:Color.LTGRAY);page.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));}
-    pie.setOnSliceSelected(index->{if(index>=0&&index<names.size()){selected.setText(names.get(index)+"\nValue: "+formatValue(values.get(index))+"\nPortfolio share: "+String.format(Locale.US,"%.2f%%",values.get(index)/chartTotal*100));syncRows[0].run();}});
+    for(int i=0;i<names.size();i++){final int index=i;LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(8),dp(5),dp(8),dp(5));row.setBackgroundColor(pageColor());View swatch=new View(this);swatch.setBackgroundColor(colors.get(i));LinearLayout.LayoutParams swatchLp=new LinearLayout.LayoutParams(dp(14),dp(14));swatchLp.rightMargin=dp(10);row.addView(swatch,swatchLp);TextView name=label(names.get(i),15);LinearLayout.LayoutParams nameLp=new LinearLayout.LayoutParams(0,-2,1f);row.addView(name,nameLp);TextView percent=label(String.format(Locale.US,"%.2f%%",values.get(i)/chartTotal*100),15);row.addView(percent);row.setOnClickListener(v->{pie.setSelected(index);syncRows[0].run();showAssetHistory(findAssetForChart(names.get(index)));});chartRows.add(row);page.addView(row);View divider=new View(this);divider.setBackgroundColor(themeMode==1?Color.DKGRAY:Color.LTGRAY);page.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));}
+    pie.setOnSliceSelected(index->{if(index>=0&&index<names.size()){syncRows[0].run();showAssetHistory(findAssetForChart(names.get(index)));}});
     setContentView(scroll);applyThemeTo(page);
   }
+
+  JSONObject findAssetForChart(String displayName){
+    for(int i=0;i<assets.length();i++){JSONObject a=assets.optJSONObject(i);if(a!=null&&(a.optString("name","Asset")+" ("+a.optString("type","")+")").equals(displayName))return a;}
+    return null;
+  }
+  void showAssetHistory(JSONObject asset){
+    if(asset==null){Toast.makeText(this,"Could not identify this asset.",Toast.LENGTH_SHORT).show();return;}
+    assetHistoryOpen=true;chartPageOpen=true;
+    ScrollView scroll=new ScrollView(this);
+    LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setPadding(dp(18),dp(12),dp(18),dp(24));page.setBackgroundColor(pageColor());scroll.addView(page);
+    LinearLayout header=new LinearLayout(this);header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);
+    Button back=new Button(this);back.setText("← Back");back.setOnClickListener(v->{assetHistoryOpen=false;showChart();});header.addView(back);
+    TextView title=label(asset.optString("name","Asset")+" Price History",20);header.addView(title,new LinearLayout.LayoutParams(0,-2,1f));page.addView(header);
+    page.addView(label("Historical price in USD from the earliest available data.",14));
+    LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.HORIZONTAL);page.addView(controls);
+    TextView statusText=label("Loading historical prices…",14);page.addView(statusText);
+    FrameLayout graphHolder=new FrameLayout(this);page.addView(graphHolder,new LinearLayout.LayoutParams(-1,dp(300)));
+    final String[] interval={"Daily"};final ArrayList<Long> timestamps=new ArrayList<>();final ArrayList<Double> priceValues=new ArrayList<>();
+    final HistoryGraph[] graph={null};final Runnable[] redraw={()->{}};
+    for(String option:new String[]{"Daily","Weekly","Monthly"}){Button b=new Button(this);b.setText(option);controls.addView(b,new LinearLayout.LayoutParams(0,-2,1f));b.setOnClickListener(v->{interval[0]=option;for(int j=0;j<controls.getChildCount();j++)controls.getChildAt(j).setAlpha(controls.getChildAt(j)==b?1f:0.65f);redraw[0].run();});}
+    new Thread(()->{
+      ArrayList<Long> ts=new ArrayList<>();ArrayList<Double> ps=new ArrayList<>();String failure=null;
+      try{
+        if("CashToken".equalsIgnoreCase(asset.optString("type"))){
+          Object result=fetchAny("https://tokenstork.com/api/tokens/"+asset.optString("id").toLowerCase(Locale.US)+"/history");
+          if(result instanceof JSONObject){
+            JSONArray points=((JSONObject)result).optJSONArray("points");Double bch=prices.get("BCH:bch");
+            if(bch==null||bch<=0){JSONObject spot=fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin-cash&vs_currencies=usd");JSONObject obj=spot.optJSONObject("bitcoin-cash");if(obj!=null)bch=obj.optDouble("usd",0);}
+            if(points!=null&&bch!=null&&bch>0)for(int i=0;i<points.length();i++){JSONObject p=points.optJSONObject(i);if(p==null||p.isNull("priceSats"))continue;double sats=p.optDouble("priceSats",Double.NaN);long time=p.optLong("ts",0);if(time>0&&Double.isFinite(sats)&&sats>=0){ts.add(time<100000000000L?time*1000L:time);ps.add(sats/100000000d*bch);}}
+          }
+        }else{
+          String id="bitcoin-cash";String type=asset.optString("type","").toUpperCase(Locale.US);
+          if(type.equals("PI"))id="pi-network";else if(type.equals("USDT"))id="tether";
+          JSONObject data=fetch("https://api.coingecko.com/api/v3/coins/"+id+"/market_chart?vs_currency=usd&days=max");
+          JSONArray points=data.optJSONArray("prices");if(points!=null)for(int i=0;i<points.length();i++){JSONArray p=points.optJSONArray(i);if(p!=null&&p.length()>1){long time=p.optLong(0);double price=p.optDouble(1,Double.NaN);if(Double.isFinite(price)&&price>=0){ts.add(time);ps.add(price);}}}
+        }
+      }catch(Exception e){failure="Could not load history. The provider may be unavailable or rate-limiting requests.";}
+      final String err=failure;
+      runOnUiThread(()->{
+        timestamps.addAll(ts);priceValues.addAll(ps);
+        if(priceValues.isEmpty()){statusText.setText(err==null?"No historical price data is available for this asset.":err);return;}
+        statusText.setText("Loaded "+priceValues.size()+" historical points • USD");
+        graph[0]=new HistoryGraph(this,timestamps,priceValues,interval[0]);graphHolder.addView(graph[0],new FrameLayout.LayoutParams(-1,-1));
+        redraw[0]=()->{if(graph[0]!=null){graph[0].interval=interval[0];graph[0].invalidate();}};
+        redraw[0].run();applyThemeTo(page);
+      });
+    }).start();
+    setContentView(scroll);applyThemeTo(page);
+  }
+  class HistoryGraph extends View{
+    final ArrayList<Long> times;final ArrayList<Double> values;String interval;
+    final android.graphics.Paint paint=new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+    HistoryGraph(Context c,ArrayList<Long> t,ArrayList<Double> v,String i){super(c);times=new ArrayList<>(t);values=new ArrayList<>(v);interval=i;setContentDescription("Asset historical price line chart");}
+    @Override protected void onDraw(Canvas canvas){super.onDraw(canvas);if(values.isEmpty())return;
+      long unit=86400000L;if("Weekly".equals(interval))unit*=7;else if("Monthly".equals(interval))unit=30L*86400000L;
+      TreeMap<Long,double[]> groups=new TreeMap<>();for(int i=0;i<values.size();i++){long bucket=(times.get(i)/unit)*unit;double[] a=groups.get(bucket);if(a==null){a=new double[]{0,0};groups.put(bucket,a);}a[0]+=values.get(i);a[1]++;}
+      ArrayList<Double> vals=new ArrayList<>();for(double[] a:groups.values())vals.add(a[0]/a[1]);if(vals.isEmpty())return;
+      double min=Collections.min(vals),max=Collections.max(vals);if(min==max){min=Math.max(0,min*0.95);max=max*1.05+0.00000001;}
+      float left=dp(62),right=getWidth()-dp(12),top=dp(20),bottom=getHeight()-dp(42);if(right<=left||bottom<=top)return;
+      paint.setColor(textColor());paint.setTextSize(dp(11));paint.setStyle(android.graphics.Paint.Style.FILL);canvas.drawText(String.format(Locale.US,"%.6g",max),dp(2),top+dp(4),paint);canvas.drawText(String.format(Locale.US,"%.6g",min),dp(2),bottom,paint);
+      paint.setStyle(android.graphics.Paint.Style.STROKE);paint.setStrokeWidth(dp(1));canvas.drawLine(left,top,left,bottom,paint);canvas.drawLine(left,bottom,right,bottom,paint);
+      paint.setColor(themeMode==1?Color.rgb(100,220,180):themeMode==2?Color.WHITE:Color.rgb(12,150,115));paint.setStrokeWidth(dp(2));android.graphics.Path path=new android.graphics.Path();
+      for(int i=0;i<vals.size();i++){float x=left+(right-left)*(vals.size()==1?0.5f:(float)i/(vals.size()-1));float y=bottom-(float)((vals.get(i)-min)/(max-min))*(bottom-top);if(i==0)path.moveTo(x,y);else path.lineTo(x,y);}canvas.drawPath(path,paint);
+      paint.setStyle(android.graphics.Paint.Style.FILL);paint.setColor(textColor());String first=android.text.format.DateFormat.format("yyyy-MM-dd",groups.firstKey()).toString(),last=android.text.format.DateFormat.format("yyyy-MM-dd",groups.lastKey()).toString();canvas.drawText(first,left,bottom+dp(22),paint);canvas.drawText(last,Math.max(left,right-paint.measureText(last)),bottom+dp(22),paint);
+    }
+  }
+
   interface SliceListener{void onSelected(int index);}
   class PieChartView extends View{
     final ArrayList<Double> values;final ArrayList<Integer> colors;final double total;final android.graphics.Paint paint=new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);final android.graphics.RectF oval=new android.graphics.RectF();SliceListener listener;int selected=-1;
