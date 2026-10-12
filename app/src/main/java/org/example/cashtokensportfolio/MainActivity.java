@@ -124,7 +124,7 @@ public class MainActivity extends Activity {
     layout.setOrientation(LinearLayout.VERTICAL);
     layout.setPadding(dp(24),dp(12),dp(24),dp(8));
     TextView details=new TextView(this);
-    details.setText("CashTrack is a CashTokens and other cryptocurrencies tracker.\n\nVersion: "+version+"\n\nContact: francis105d1@gmail.com\n\nOfficial GitHub repository:\nhttps://github.com/guadalupeleopard/CashTokensPortfolio");
+    details.setText("CashTrack is a CashTokens and other cryptocurrencies tracker.\n\nRelease version: "+version+"\n\nContact: francis105d1@gmail.com\n\nOfficial GitHub repository:\nhttps://github.com/guadalupeleopard/CashTokensPortfolio");
     details.setTextSize(15);
     details.setAutoLinkMask(android.text.util.Linkify.EMAIL_ADDRESSES|android.text.util.Linkify.WEB_URLS);
     details.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
