@@ -30,7 +30,17 @@ public class MainActivity extends Activity {
     for(int i=0;i<assets.length();i++){JSONObject a=assets.optJSONObject(i);if(a==null)continue;final int index=i;String k=key(a);Double price=prices.get(k);double qty=a.optDouble("quantity",0);String title=a.optString("name","Token");
       String val=price==null?"Price unavailable":String.format(Locale.US,"$%,.4f",qty*price);if(price==null)incomplete=true;else sum+=qty*price;
       LinearLayout row=new LinearLayout(this);row.setOrientation(1);row.setPadding(dp(12),dp(8),dp(12),dp(8));row.setBackgroundColor(Color.WHITE);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(8);items.addView(row,lp);
-      row.addView(label(title+" ("+a.optString("type")+")",18));row.addView(label("Quantity: "+a.optString("quantity")+"   •   "+val,15));
+      LinearLayout titleRow=new LinearLayout(this);titleRow.setOrientation(0);titleRow.setGravity(Gravity.CENTER_VERTICAL);
+      ImageView icon=new ImageView(this);int iconId;
+      String assetType=a.optString("type");
+      if("BCH".equalsIgnoreCase(assetType))iconId=R.drawable.ic_asset_bch;
+      else if("PI".equalsIgnoreCase(assetType))iconId=R.drawable.ic_asset_pi;
+      else if("USDT".equalsIgnoreCase(assetType))iconId=R.drawable.ic_asset_usdt;
+      else iconId=R.drawable.ic_asset_cashtoken;
+      LinearLayout.LayoutParams iconLp=new LinearLayout.LayoutParams(dp(22),dp(22));iconLp.rightMargin=dp(7);
+      icon.setImageResource(iconId);icon.setScaleType(ImageView.ScaleType.FIT_CENTER);titleRow.addView(icon,iconLp);
+      TextView assetTitle=label(title+" ("+assetType+")",18);assetTitle.setPadding(dp(2),dp(8),dp(4),dp(8));titleRow.addView(assetTitle);
+      row.addView(titleRow);row.addView(label("Quantity: "+a.optString("quantity")+"   •   "+val,15));
       addButton(row,"Edit / Remove",()->editDialog(index));
     }
     total.setText(String.format(Locale.US,"Known value: $%,.2f USD",sum));if(incomplete)total.append("\n(Excludes unpriced assets)");
