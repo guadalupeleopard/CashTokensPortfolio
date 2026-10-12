@@ -21,6 +21,10 @@ import java.util.*;
 public class MainActivity extends Activity {
   LinearLayout root, items; TextView total, status; Button themeButton, chartButton; JSONArray assets = new JSONArray(); int selectedChartSlice=-1;
   int themeMode=0; // 0=Day, 1=Dark, 2=Bitcoin Cash
+  boolean chartPageOpen=false;
+  long lastMainBackPress=0;
+  final Handler mainBackHandler=new Handler(Looper.getMainLooper());
+  Runnable pendingClosePrompt;
   String displayCurrency="USD";
   double currencyRate=1.0;
   final String[] currencyCodes={"USD","BCH","MXN","ARS","VND","PHP","JPY","CNY"};
@@ -139,7 +143,31 @@ public class MainActivity extends Activity {
   void applyThemeTo(View view){if(view instanceof TextView){((TextView)view).setTextColor(textColor());}if(view instanceof Button){view.setBackgroundTintList(android.content.res.ColorStateList.valueOf(buttonColor()));}if(view instanceof LinearLayout){LinearLayout ll=(LinearLayout)view;if(ll==root)ll.setBackgroundColor(pageColor());else if(ll==items){}else if(ll.getOrientation()==LinearLayout.VERTICAL&&ll.getChildCount()>0)ll.setBackgroundColor(cardColor());}if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++)applyThemeTo(group.getChildAt(i));}}
   @Override public void onCreate(Bundle b){super.onCreate(b);themeMode=getPreferences(0).getInt("theme_mode",0);displayCurrency=getPreferences(0).getString("display_currency","USD");if(!Arrays.asList(currencyCodes).contains(displayCurrency))displayCurrency="USD";configureNavigationBar();try{assets=new JSONArray(getPreferences(0).getString(PREF,"[]"));}catch(Exception ignored){} build(); refresh();}
   void save(){getPreferences(0).edit().putString(PREF,assets.toString()).apply();}
-  void build(){ScrollView scroll=new ScrollView(this);
+  @Override public void onBackPressed(){
+    if(chartPageOpen){build();return;}
+    long now=System.currentTimeMillis();
+    if(now-lastMainBackPress<=1800){
+      lastMainBackPress=0;
+      if(pendingClosePrompt!=null)mainBackHandler.removeCallbacks(pendingClosePrompt);
+      pendingClosePrompt=null;
+      finish();
+      return;
+    }
+    lastMainBackPress=now;
+    Toast.makeText(this,"Press Back again to close, or wait to confirm.",Toast.LENGTH_SHORT).show();
+    pendingClosePrompt=()->{
+      pendingClosePrompt=null;
+      lastMainBackPress=0;
+      if(isFinishing()||chartPageOpen)return;
+      new AlertDialog.Builder(this).setTitle("Close CashTrack?")
+        .setMessage("Do you want to close the application?")
+        .setPositiveButton("Close",(dialog,which)->finish())
+        .setNegativeButton("Cancel",null).show();
+    };
+    mainBackHandler.postDelayed(pendingClosePrompt,1900);
+  }
+
+  void build(){chartPageOpen=false;ScrollView scroll=new ScrollView(this);
     scroll.setOnApplyWindowInsetsListener((view,insets)->{
       int bottom;
       if(Build.VERSION.SDK_INT>=30)bottom=insets.getInsets(WindowInsets.Type.navigationBars()).bottom;
@@ -233,6 +261,7 @@ public class MainActivity extends Activity {
     return assigned;
   }
   void showChart(){
+    chartPageOpen=true;
     ScrollView scroll=new ScrollView(this);
     LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setPadding(dp(18),dp(16),dp(18),dp(24));page.setBackgroundColor(pageColor());scroll.addView(page);
     LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);header.setOrientation(LinearLayout.HORIZONTAL);
@@ -264,32 +293,41 @@ public class MainActivity extends Activity {
       super.onDraw(canvas);float width=Math.min(getWidth()-dp(30),getHeight()*1.18f);float height=width*0.68f;float depth=dp(18);
       if(width<=0||height<=0)return;float left=(getWidth()-width)/2f,top=(getHeight()-height-depth)/2f;
       oval.set(left,top,left+width,top+height);
-      // Draw the pie's darker extruded side in layers to create a 3D thickness effect.
-      for(int layer=(int)depth;layer>=1;layer--){float offset=layer;float start=-90f;for(int i=0;i<values.size();i++){float sweep=(float)(values.get(i)/total*360d);paint.setColor(shade(colors.get(i),0.52f));paint.setStyle(android.graphics.Paint.Style.FILL);canvas.drawArc(oval,start,sweep,false,paint);canvas.drawArc(oval,start,sweep,true,paint);start+=sweep;}canvas.save();canvas.translate(0,offset);start=-90f;for(int i=0;i<values.size();i++){float sweep=(float)(values.get(i)/total*360d);paint.setColor(shade(colors.get(i),0.52f));canvas.drawArc(oval,start,sweep,true,paint);start+=sweep;}canvas.restore();}
+      boolean isolateSmallSelection=selected>=0&&selected<values.size()&&values.get(selected)/total<0.05d;
+      // Extruded side. When a selected slice is under 5%, hide the other slices
+      // so the small slice can be examined clearly.
+      for(int layer=(int)depth;layer>=1;layer--){
+        float start=-90f;
+        for(int i=0;i<values.size();i++){
+          float sweep=(float)(values.get(i)/total*360d);
+          if(isolateSmallSelection&&i!=selected){start+=sweep;continue;}
+          if(i==selected){
+            float mid=(float)Math.toRadians(start+sweep/2);
+            float dx=(float)Math.cos(mid)*dp(13);
+            float dy=(float)Math.sin(mid)*dp(9)-dp(13);
+            canvas.save();canvas.translate(dx,dy+layer);
+            paint.setColor(shade(colors.get(i),0.42f));paint.setStyle(android.graphics.Paint.Style.FILL);
+            canvas.drawArc(oval,start,sweep,true,paint);canvas.restore();
+          }else{
+            canvas.save();canvas.translate(0,layer);
+            paint.setColor(shade(colors.get(i),0.52f));paint.setStyle(android.graphics.Paint.Style.FILL);
+            canvas.drawArc(oval,start,sweep,true,paint);canvas.restore();
+          }
+          start+=sweep;
+        }
+      }
       float start=-90f;
       for(int i=0;i<values.size();i++){
         float sweep=(float)(values.get(i)/total*360d);
+        if(isolateSmallSelection&&i!=selected){start+=sweep;continue;}
         paint.setColor(colors.get(i));paint.setStyle(android.graphics.Paint.Style.FILL);
         if(i==selected){
-          // Lift the selected slice diagonally upward and outward, including its
-          // dark extruded edge, so the whole piece visibly separates from the pie.
           float mid=(float)Math.toRadians(start+sweep/2);
           float dx=(float)Math.cos(mid)*dp(13);
           float dy=(float)Math.sin(mid)*dp(9)-dp(13);
-          for(int layer=(int)depth;layer>=1;layer--){
-            canvas.save();canvas.translate(dx,dy+layer);
-            paint.setColor(shade(colors.get(i),0.42f));
-            canvas.drawArc(oval,start,sweep,true,paint);
-            canvas.restore();
-          }
           canvas.save();canvas.translate(dx,dy);
-          paint.setColor(colors.get(i));
-          canvas.drawArc(oval,start,sweep,true,paint);
-          canvas.restore();
-        }else{
-          paint.setColor(colors.get(i));
-          canvas.drawArc(oval,start,sweep,true,paint);
-        }
+          canvas.drawArc(oval,start,sweep,true,paint);canvas.restore();
+        }else canvas.drawArc(oval,start,sweep,true,paint);
         start+=sweep;
       }
       if(selected>=0&&selected<values.size()){
