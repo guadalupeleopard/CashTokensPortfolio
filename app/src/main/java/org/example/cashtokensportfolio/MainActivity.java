@@ -594,21 +594,18 @@ public class MainActivity extends Activity {
       notes.append("CoinGecko OK. ");
     }catch(Exception e){notes.append("CoinGecko unavailable. ");}
     int found=0,missing=0;
-    // Use CauldronSwap's own AMM-derived price history, not TokenStork's
-    // cross-indexed quote. The newest recent observation is denominated in
-    // BCH satoshi-equivalent units and converted to USD with the BCH/USD rate.
-    // If Cauldron has no recent observation, leave the token unpriced rather
-    // than presenting a stale or unrelated quote as current.
-    long nowSeconds=System.currentTimeMillis()/1000L;
-    long startSeconds=nowSeconds-7L*24L*60L*60L;
+    // Main-page quotes use CauldronSwap's current-price endpoint, not its
+    // historical chart endpoint. Convert the returned BCH-denominated quote
+    // to USD using the current BCH/USD rate. Never substitute a historical
+    // observation for a current quote.
     for(int i=0;i<assets.length();i++){
       JSONObject asset=assets.optJSONObject(i);
       if(asset==null||!"CashToken".equals(asset.optString("type")))continue;
       String category=asset.optString("id").toLowerCase(Locale.US);
       try{
-        String url="https://indexer.riften.net/cauldron/price/"+category+"/history?start="+startSeconds+"&end="+nowSeconds+"&stepsize=600";
+        String url="https://indexer.riften.net/cauldron/price/"+category;
         Object response=fetchAny(url);
-        Double priceUnits=extractLatestCauldronHistoryPrice(response,nowSeconds-24L*60L*60L);
+        Double priceUnits=extractCurrentCauldronPrice(response);
         Double bch=prices.get("BCH:bch");
         if(priceUnits!=null&&bch!=null){
           double sats=priceUnits*(isCauldronStablecoin(asset)?100d:1d);
@@ -725,6 +722,33 @@ public class MainActivity extends Activity {
       if(bitmap!=null){cashTokenIconCache.put(category,bitmap);runOnUiThread(()->{if(!isFinishing())render();});}
     }).start();
     target.setTag(category);
+  }
+  Double extractCurrentCauldronPrice(Object data){
+    if(data instanceof JSONObject){
+      JSONObject o=(JSONObject)data;
+      // Prefer explicit current-price fields. The generic "price" field is
+      // accepted only from this current-price endpoint, never from history.
+      for(String field:new String[]{"currentPrice","current_price","price","priceSats","price_sats","avg"}){
+        if(!o.isNull(field)){
+          Object raw=o.opt(field);
+          double n=Double.NaN;
+          if(raw instanceof Number)n=((Number)raw).doubleValue();
+          else if(raw instanceof String)try{n=Double.parseDouble((String)raw);}catch(Exception ignored){}
+          if(Double.isFinite(n)&&n>0)return n;
+        }
+      }
+      for(String field:new String[]{"data","result","current","token","priceInfo","price_info"}){
+        Double n=extractCurrentCauldronPrice(o.opt(field));
+        if(n!=null)return n;
+      }
+    }else if(data instanceof JSONArray){
+      JSONArray a=(JSONArray)data;
+      for(int i=0;i<a.length();i++){
+        Double n=extractCurrentCauldronPrice(a.opt(i));
+        if(n!=null)return n;
+      }
+    }
+    return null;
   }
   Double extractLatestCauldronHistoryPrice(Object data,long minimumTimestamp){
     if(!(data instanceof JSONObject))return null;
