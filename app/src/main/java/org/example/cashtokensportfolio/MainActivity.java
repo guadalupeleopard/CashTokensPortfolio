@@ -317,7 +317,7 @@ public class MainActivity extends Activity {
           else if(type.equals("USDT"))symbol="USDCUSDT";
           // Use public Binance daily candles to avoid CoinGecko API-key authorization errors.
           // Binance returns at most 1000 daily candles per request.
-          Object response=fetchAny("https://api.binance.com/api/v3/klines?symbol="+symbol+"&interval=1d&limit=1000");
+          Object response=fetchAny("https://data-api.binance.vision/api/v3/klines?symbol="+symbol+"&interval=1d&limit=1000");
           JSONArray points=response instanceof JSONArray?(JSONArray)response:null;
           if(points!=null)for(int i=0;i<points.length();i++){
             JSONArray p=points.optJSONArray(i);if(p==null||p.length()<5)continue;
