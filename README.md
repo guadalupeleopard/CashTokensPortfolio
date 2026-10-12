@@ -1,22 +1,32 @@
-# CashTokens Portfolio — Android source v1.2
+# CashTrack
 
-Native Android Java application (Android 8+). Includes a GitHub Actions workflow to build a debug APK in the cloud.
+CashTrack is a cryptocurrency tracker for Bitcoin Cash (BCH), its CashTokens DeFi ecosystem, and other crypto assets.
+
+## Disclaimer
+
+This software is provided **as is**, without warranties of any kind. It may contain bugs, display inaccurate or unavailable market data, or stop working when third-party services change. Use it at your own risk. Always verify important information independently.
+
+## Source code and usage
+
+The source code is publicly available for viewing. **No license is granted to copy, modify, redistribute, or otherwise reuse this software. All rights are reserved by the copyright holder, except where applicable law provides otherwise.**
 
 ## Build an APK with GitHub Actions
 
 1. Open the repository's **Actions** tab.
-2. Wait for **Build CashTokens Portfolio APK** to finish successfully.
+2. Wait for the **Build CashTokens Portfolio APK** workflow to finish successfully.
 3. Open the completed run and download the `CashTokensPortfolio-debug-apk` artifact. Unzip it to get the `.apk` file.
 4. Transfer the APK to your Android phone and install it. Android may ask you to allow installs from the app you used to download/open the file. Only install APKs you built or trust.
 
 The workflow uses Java 17, Android SDK 35, and Gradle 8.9, then runs `assembleDebug` and uploads the APK as a workflow artifact. It produces a **debug APK**, not a Play Store release package.
 
-## Market feeds
-- CoinGecko public simple/price endpoint for BCH, PI and USDT.
-- TokenStork public directory endpoint for CashTokens, searched by full 64-character category ID.
-- USD prices are accepted only from explicitly named USD fields; alternatively satoshi-denominated prices are converted using BCH/USD. Ambiguous prices are never guessed.
+## Market data
 
-**Important:** TokenStork response field mapping and live CashToken prices have NOT been verified against a successful API response. Some or all CashTokens may show `Price unavailable`. API availability, throttling and terms can change.
+- CoinGecko public simple/price endpoint for BCH, PI, and USDT.
+- TokenStork public directory endpoint for CashTokens, searched by full 64-character category ID.
+- Price availability and accuracy depend on third-party services.
+
+**Important:** TokenStork response field mapping and live CashToken prices have not been verified against a successful API response. Some or all CashTokens may show “Price unavailable.” API availability, throttling, and terms can change.
 
 ## Privacy
-No seed phrase, wallet keys, or account required. Holdings are saved locally. Network requests expose the category IDs being queried to market-data providers.
+
+No seed phrase, wallet keys, or account are required. Holdings are saved locally. Network requests expose the category IDs being queried to market-data providers.
