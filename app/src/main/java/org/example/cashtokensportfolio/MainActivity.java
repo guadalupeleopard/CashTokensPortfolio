@@ -565,32 +565,20 @@ public class MainActivity extends Activity {
       notes.append("CoinGecko OK. ");
     }catch(Exception e){notes.append("CoinGecko unavailable. ");}
     int found=0,missing=0;
-    // TokenStork's directory endpoint does not expose live venue prices.
-    // Its per-category history endpoint returns priceSats points for Cauldron/Fex.
-    // Match the exact category ID in the URL; convert BCH satoshis to USD using BCH/USD.
+    // TokenStork supplies cached market history for all CashTokens it tracks.
+    // Use its newest available venue price for the main portfolio page, then
+    // convert BCH satoshis to USD using the current BCH/USD rate.
     for(int i=0;i<assets.length();i++){
       JSONObject asset=assets.optJSONObject(i);
       if(asset==null||!"CashToken".equals(asset.optString("type")))continue;
       String category=asset.optString("id").toLowerCase(Locale.US);
       try{
-        boolean stablecoin=isCauldronStablecoin(asset);
-        Double priceBch=null;
-        if(stablecoin){
-          // Cauldron's current-price value for these stablecoins is in micro-BCH units.
-          Object response=fetchAny("https://indexer.riften.net/cauldron/price/"+category+"/current");
-          if(response instanceof JSONObject){
-            double priceUnits=((JSONObject)response).optDouble("price",Double.NaN);
-            if(Double.isFinite(priceUnits)&&priceUnits>=0)priceBch=priceUnits/1000000d;
-          }
-        }else{
-          String url="https://tokenstork.com/api/tokens/"+category+"/history";
-          Object response=fetchAny(url);
-          Double sats=extractLatestHistorySats(response);
-          if(sats!=null)priceBch=sats/100000000d;
-        }
+        String url="https://tokenstork.com/api/tokens/"+category+"/history";
+        Object response=fetchAny(url);
+        Double sats=extractLatestHistorySats(response);
         Double bch=prices.get("BCH:bch");
-        if(priceBch!=null&&bch!=null){
-          double usd=priceBch*bch;
+        if(sats!=null&&bch!=null){
+          double usd=(sats/100000000d)*bch;
           if(Double.isFinite(usd)&&usd>=0){prices.put(key(asset),usd);found++;}else missing++;
         }else missing++;
       }catch(Exception e){missing++;}
