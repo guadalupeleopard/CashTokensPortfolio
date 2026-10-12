@@ -171,32 +171,66 @@ public class MainActivity extends Activity {
     String type=a.optString("type","");String name=a.optString("name","").toLowerCase(Locale.US);
     return type.equalsIgnoreCase("PI")||name.equals("pi")||name.contains("pi network");
   }
-  int chartAssetColor(JSONObject a, HashSet<Integer> usedColors){
-    int preferred=chartAssetPreferredColor(a);
-    // Always preserve the requested signature colors for Bitcoin Cash and Pi,
-    // regardless of the order in which assets appear in the portfolio.
-    int bchGreen=Color.rgb(12,193,142), piPurple=Color.rgb(123,78,200);
-    if(!usedColors.contains(preferred)
-        && (isBchChartAsset(a)||preferred!=bchGreen)
-        && (isPiChartAsset(a)||preferred!=piPurple)) return preferred;
-    int[][] alternatives={
-      {Color.rgb(247,147,26),Color.rgb(230,126,34),Color.rgb(255,193,7),Color.rgb(190,100,35)},
-      {Color.rgb(42,119,210),Color.rgb(52,152,219),Color.rgb(41,128,185),Color.rgb(0,188,212)},
-      {Color.rgb(239,91,52),Color.rgb(231,76,60),Color.rgb(192,57,43),Color.rgb(255,112,67)},
-      {Color.rgb(98,126,234),Color.rgb(103,58,183),Color.rgb(156,39,176),Color.rgb(121,85,72)},
-      {Color.rgb(38,161,123),Color.rgb(46,204,113),Color.rgb(0,150,136),Color.rgb(139,195,74)},
-      {Color.rgb(233,30,99),Color.rgb(0,150,136),Color.rgb(63,81,181),Color.rgb(121,134,203)}
-    };
-    int group=isBchChartAsset(a)?4:isPiChartAsset(a)?3:Math.floorMod((a.optString("type","")+a.optString("name","")).hashCode(),alternatives.length);
-    for(int c:alternatives[group]) if(!usedColors.contains(c)&&c!=bchGreen&&c!=piPurple)return c;
-    int[] palette={Color.rgb(255,193,7),Color.rgb(0,188,212),Color.rgb(233,30,99),Color.rgb(103,58,183),Color.rgb(121,85,72),Color.rgb(96,125,139),Color.rgb(205,220,57),Color.rgb(255,87,34),Color.rgb(63,81,181),Color.rgb(0,150,136),Color.rgb(156,39,176),Color.rgb(121,134,203)};
-    for(int c:palette) if(!usedColors.contains(c)&&c!=bchGreen&&c!=piPurple)return c;
-    // For very large portfolios, generate additional distinct hues as needed.
-    for(int hue=0;hue<360;hue++){
-      int c=Color.HSVToColor(new float[]{hue,0.78f,0.92f});
-      if(!usedColors.contains(c)&&c!=bchGreen&&c!=piPurple)return c;
+  String chartColorKey(JSONObject a){return key(a);}
+  HashMap<String,Integer> ensureUniqueChartColors(){
+    final int bchGreen=Color.rgb(12,193,142), piPurple=Color.rgb(123,78,200);
+    android.content.SharedPreferences prefs=getSharedPreferences(PREF+"_chart_colors",MODE_PRIVATE);
+    HashMap<String,Integer> assigned=new HashMap<>();
+    HashSet<Integer> used=new HashSet<>();
+    // Reserve signature colors first so BCH is always green and Pi is always purple.
+    for(int i=0;i<assets.length();i++){
+      JSONObject a=assets.optJSONObject(i);if(a==null)continue;
+      String k=chartColorKey(a);
+      if(isBchChartAsset(a)){assigned.put(k,bchGreen);used.add(bchGreen);}
+      else if(isPiChartAsset(a)){assigned.put(k,piPurple);used.add(piPurple);}
     }
-    return Color.WHITE;
+    // Keep each previously saved color when it is still unique.
+    for(int i=0;i<assets.length();i++){
+      JSONObject a=assets.optJSONObject(i);if(a==null)continue;
+      String k=chartColorKey(a);if(assigned.containsKey(k))continue;
+      if(!prefs.contains(k))continue;
+      int saved=prefs.getInt(k,Color.TRANSPARENT);
+      if(saved!=Color.TRANSPARENT&&!used.contains(saved)){assigned.put(k,saved);used.add(saved);}
+    }
+    // Give every other current asset its own color, and save it so future additions
+    // cannot take a color that already belongs to an existing asset.
+    for(int i=0;i<assets.length();i++){
+      JSONObject a=assets.optJSONObject(i);if(a==null)continue;
+      String k=chartColorKey(a);if(assigned.containsKey(k))continue;
+      int preferred=chartAssetPreferredColor(a);
+      int chosen=Color.TRANSPARENT;
+      if(preferred!=bchGreen&&preferred!=piPurple&&!used.contains(preferred))chosen=preferred;
+      if(chosen==Color.TRANSPARENT){
+        int[][] alternatives={
+          {Color.rgb(247,147,26),Color.rgb(230,126,34),Color.rgb(255,193,7),Color.rgb(190,100,35)},
+          {Color.rgb(42,119,210),Color.rgb(52,152,219),Color.rgb(41,128,185),Color.rgb(0,188,212)},
+          {Color.rgb(239,91,52),Color.rgb(231,76,60),Color.rgb(192,57,43),Color.rgb(255,112,67)},
+          {Color.rgb(98,126,234),Color.rgb(103,58,183),Color.rgb(156,39,176),Color.rgb(121,85,72)},
+          {Color.rgb(38,161,123),Color.rgb(46,204,113),Color.rgb(0,150,136),Color.rgb(139,195,74)},
+          {Color.rgb(233,30,99),Color.rgb(0,150,136),Color.rgb(63,81,181),Color.rgb(121,134,203)}
+        };
+        int group=Math.floorMod((a.optString("type","")+a.optString("name","")).hashCode(),alternatives.length);
+        for(int c:alternatives[group])if(!used.contains(c)&&c!=bchGreen&&c!=piPurple){chosen=c;break;}
+      }
+      if(chosen==Color.TRANSPARENT){
+        int[] palette={Color.rgb(255,193,7),Color.rgb(0,188,212),Color.rgb(233,30,99),Color.rgb(103,58,183),Color.rgb(121,85,72),Color.rgb(96,125,139),Color.rgb(205,220,57),Color.rgb(255,87,34),Color.rgb(63,81,181),Color.rgb(0,150,136),Color.rgb(156,39,176),Color.rgb(121,134,203)};
+        for(int c:palette)if(!used.contains(c)&&c!=bchGreen&&c!=piPurple){chosen=c;break;}
+      }
+      if(chosen==Color.TRANSPARENT){
+        for(int hue=0;hue<360;hue++){int c=Color.HSVToColor(new float[]{hue,0.78f,0.92f});if(!used.contains(c)&&c!=bchGreen&&c!=piPurple){chosen=c;break;}}
+      }
+      // Continue with progressively different hues if a very large portfolio uses
+      // every color in the first pass; uniqueness is more important than a fixed palette.
+      if(chosen==Color.TRANSPARENT){
+        for(int hue=0;hue<360;hue++){int c=Color.HSVToColor(new float[]{hue,0.45f,0.70f});if(!used.contains(c)&&c!=bchGreen&&c!=piPurple){chosen=c;break;}}
+      }
+      if(chosen==Color.TRANSPARENT)chosen=Color.HSVToColor(new float[]{(float)(assigned.size()*137.508%360),0.90f,0.95f});
+      assigned.put(k,chosen);used.add(chosen);
+    }
+    android.content.SharedPreferences.Editor editor=prefs.edit();
+    for(Map.Entry<String,Integer> entry:assigned.entrySet())editor.putInt(entry.getKey(),entry.getValue());
+    editor.apply();
+    return assigned;
   }
   void showChart(){
     ScrollView scroll=new ScrollView(this);
@@ -206,8 +240,8 @@ public class MainActivity extends Activity {
     TextView title=label("Portfolio Chart",23);LinearLayout.LayoutParams titleLp=new LinearLayout.LayoutParams(0,-2,1f);titleLp.leftMargin=dp(12);header.addView(title,titleLp);page.addView(header);
     page.addView(label("3D asset allocation by current known value",14));
     ArrayList<String> names=new ArrayList<>();ArrayList<Double> values=new ArrayList<>();ArrayList<Integer> colors=new ArrayList<>();double sum=0;
-    HashSet<Integer> usedChartColors=new HashSet<>();
-    for(int i=0;i<assets.length();i++){JSONObject a=assets.optJSONObject(i);if(a==null)continue;Double price=prices.get(key(a));double qty=a.optDouble("quantity",0);if(price==null||!Double.isFinite(price)||price<0||qty<=0)continue;double value=qty*price;if(!Double.isFinite(value)||value<=0)continue;names.add(a.optString("name","Asset")+" ("+a.optString("type","")+")");values.add(value);int assetColor=chartAssetColor(a,usedChartColors);colors.add(assetColor);usedChartColors.add(assetColor);sum+=value;}
+    HashMap<String,Integer> chartColors=ensureUniqueChartColors();
+    for(int i=0;i<assets.length();i++){JSONObject a=assets.optJSONObject(i);if(a==null)continue;Double price=prices.get(key(a));double qty=a.optDouble("quantity",0);if(price==null||!Double.isFinite(price)||price<0||qty<=0)continue;double value=qty*price;if(!Double.isFinite(value)||value<=0)continue;names.add(a.optString("name","Asset")+" ("+a.optString("type","")+")");values.add(value);colors.add(chartColors.get(chartColorKey(a)));sum+=value;}
     if(values.isEmpty()){TextView empty=label("No priced assets with a positive value are available to chart yet. Add assets and refresh market prices, then return here.",16);page.addView(empty);setContentView(scroll);applyThemeTo(page);return;}
     final double chartTotal=sum;
     PieChartView pie=new PieChartView(this,values,colors,chartTotal);LinearLayout.LayoutParams pieLp=new LinearLayout.LayoutParams(-1,dp(300));pieLp.topMargin=dp(8);page.addView(pie,pieLp);
