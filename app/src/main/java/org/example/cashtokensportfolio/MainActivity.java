@@ -59,7 +59,8 @@ public class MainActivity extends Activity {
   int cardColor(){return themeMode==1?Color.rgb(18,18,18):themeMode==2?Color.rgb(7,151,108):Color.WHITE;}
   int textColor(){return themeMode==1?Color.WHITE:themeMode==2?Color.WHITE:Color.BLACK;}
   int buttonColor(){return themeMode==1?Color.rgb(45,45,45):themeMode==2?Color.rgb(0,105,76):Color.rgb(235,241,239);}
-  void openMenu(){String current=themeMode==0?"Day":themeMode==1?"Dark":"Bitcoin Cash Green";new AlertDialog.Builder(this).setTitle("Menu").setItems(new String[]{"Background: "+current,"Currency: "+displayCurrency,"Donate","About"},(dialog,which)->{if(which==0)chooseTheme();else if(which==1)chooseCurrency();else if(which==2)showDonate();else if(which==3)showAbout();}).show();}
+  void openMenu(){String current=themeMode==0?"Day":themeMode==1?"Dark":"Bitcoin Cash Green";new AlertDialog.Builder(this).setTitle("Menu").setItems(new String[]{"Background: "+current,"Currency: "+displayCurrency,"Asset Price History","Donate","About"},(dialog,which)->{if(which==0)chooseTheme();else if(which==1)chooseCurrency();else if(which==2)chooseAssetForHistory();else if(which==3)showDonate();else if(which==4)showAbout();}).show();}
+  void chooseAssetForHistory(){ArrayList<JSONObject> choices=new ArrayList<>();ArrayList<String> labels=new ArrayList<>();for(int i=0;i<assets.length();i++){JSONObject a=assets.optJSONObject(i);if(a!=null){choices.add(a);labels.add(a.optString("name","Asset")+" ("+a.optString("type","")+")");}}if(choices.isEmpty()){Toast.makeText(this,"Add an asset first.",Toast.LENGTH_SHORT).show();return;}new AlertDialog.Builder(this).setTitle("Choose asset price history").setItems(labels.toArray(new String[0]),(dialog,which)->{if(which>=0&&which<choices.size())showAssetHistory(choices.get(which));}).show();}
 
   final String DONATION_BCH="bitcoincash:qzdz6jxh5kjglqzr454x4pjmwwfw5p336uupk7adpg";
   final String DONATION_TOKEN="bitcoincash:zzdz6jxh5kjglqzr454x4pjmwwfw5p336umt9qnt7m";
@@ -143,7 +144,7 @@ public class MainActivity extends Activity {
   @Override public void onCreate(Bundle b){super.onCreate(b);themeMode=getPreferences(0).getInt("theme_mode",0);displayCurrency=getPreferences(0).getString("display_currency","USD");if(!Arrays.asList(currencyCodes).contains(displayCurrency))displayCurrency="USD";configureNavigationBar();try{assets=new JSONArray(getPreferences(0).getString(PREF,"[]"));}catch(Exception ignored){} build(); refresh();}
   void save(){getPreferences(0).edit().putString(PREF,assets.toString()).apply();}
   @Override public void onBackPressed(){
-    if(assetHistoryOpen){assetHistoryOpen=false;showChart();return;}
+    if(assetHistoryOpen){assetHistoryOpen=false;build();return;}
     if(chartPageOpen){build();return;}
     long now=System.currentTimeMillis();
     if(now-lastMainBackPress<=1800){
@@ -278,8 +279,8 @@ public class MainActivity extends Activity {
     TextView instruction=label("Tap a 3D slice or an asset below. Both selections stay synchronized.",13);page.addView(instruction);
     ArrayList<LinearLayout> chartRows=new ArrayList<>();
     final Runnable[] syncRows={()->{for(int j=0;j<chartRows.size();j++){chartRows.get(j).setBackgroundColor(j==pie.selected?buttonColor():pageColor());}}};
-    for(int i=0;i<names.size();i++){final int index=i;LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(8),dp(5),dp(8),dp(5));row.setBackgroundColor(pageColor());View swatch=new View(this);swatch.setBackgroundColor(colors.get(i));LinearLayout.LayoutParams swatchLp=new LinearLayout.LayoutParams(dp(14),dp(14));swatchLp.rightMargin=dp(10);row.addView(swatch,swatchLp);TextView name=label(names.get(i),15);LinearLayout.LayoutParams nameLp=new LinearLayout.LayoutParams(0,-2,1f);row.addView(name,nameLp);TextView percent=label(String.format(Locale.US,"%.2f%%",values.get(i)/chartTotal*100),15);row.addView(percent);row.setOnClickListener(v->{pie.setSelected(index);syncRows[0].run();showAssetHistory(findAssetForChart(names.get(index)));});chartRows.add(row);page.addView(row);View divider=new View(this);divider.setBackgroundColor(themeMode==1?Color.DKGRAY:Color.LTGRAY);page.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));}
-    pie.setOnSliceSelected(index->{if(index>=0&&index<names.size()){syncRows[0].run();showAssetHistory(findAssetForChart(names.get(index)));}});
+    for(int i=0;i<names.size();i++){final int index=i;LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(8),dp(5),dp(8),dp(5));row.setBackgroundColor(pageColor());View swatch=new View(this);swatch.setBackgroundColor(colors.get(i));LinearLayout.LayoutParams swatchLp=new LinearLayout.LayoutParams(dp(14),dp(14));swatchLp.rightMargin=dp(10);row.addView(swatch,swatchLp);TextView name=label(names.get(i),15);LinearLayout.LayoutParams nameLp=new LinearLayout.LayoutParams(0,-2,1f);row.addView(name,nameLp);TextView percent=label(String.format(Locale.US,"%.2f%%",values.get(i)/chartTotal*100),15);row.addView(percent);row.setOnClickListener(v->{pie.setSelected(index);syncRows[0].run();});chartRows.add(row);page.addView(row);View divider=new View(this);divider.setBackgroundColor(themeMode==1?Color.DKGRAY:Color.LTGRAY);page.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));}
+    pie.setOnSliceSelected(index->{if(index>=0&&index<names.size()){syncRows[0].run();}});
     setContentView(scroll);applyThemeTo(page);
   }
 
@@ -293,7 +294,7 @@ public class MainActivity extends Activity {
     ScrollView scroll=new ScrollView(this);
     LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setPadding(dp(18),dp(12),dp(18),dp(24));page.setBackgroundColor(pageColor());scroll.addView(page);
     LinearLayout header=new LinearLayout(this);header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);
-    Button back=new Button(this);back.setText("← Back");back.setOnClickListener(v->{assetHistoryOpen=false;showChart();});header.addView(back);
+    Button back=new Button(this);back.setText("← Back");back.setOnClickListener(v->{assetHistoryOpen=false;build();});header.addView(back);
     TextView title=label(asset.optString("name","Asset")+" Price History",20);header.addView(title,new LinearLayout.LayoutParams(0,-2,1f));page.addView(header);
     page.addView(label("Historical price in USD from the earliest available data.",14));
     LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.HORIZONTAL);page.addView(controls);
