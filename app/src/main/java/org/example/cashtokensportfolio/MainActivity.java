@@ -17,7 +17,8 @@ import java.math.*;
 import java.util.*;
 
 public class MainActivity extends Activity {
-  LinearLayout root, items; TextView total, status; JSONArray assets = new JSONArray();
+  LinearLayout root, items; TextView total, status; Button themeButton; JSONArray assets = new JSONArray();
+  int themeMode=0; // 0=Day, 1=Dark, 2=Bitcoin Cash
   final HashMap<String, Double> prices = new HashMap<>();
   final HashMap<String, String> ids = new HashMap<>();
   final HashMap<String, android.graphics.Bitmap> cashTokenIconCache = new HashMap<>();
@@ -26,7 +27,14 @@ public class MainActivity extends Activity {
   int dp(float n){return (int)(n*getResources().getDisplayMetrics().density+.5f);}
   TextView label(String s,int size){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(Color.rgb(20,40,43));t.setPadding(dp(4),dp(10),dp(4),dp(10));return t;}
   void addButton(LinearLayout parent,String title,Runnable action){Button b=new Button(this);b.setText(title);parent.addView(b);b.setOnClickListener(v->action.run());}
-  @Override public void onCreate(Bundle b){super.onCreate(b);try{assets=new JSONArray(getPreferences(0).getString(PREF,"[]"));}catch(Exception ignored){} build(); refresh();}
+  int pageColor(){return themeMode==1?Color.BLACK:themeMode==2?Color.rgb(10,193,142):Color.WHITE;}
+  int cardColor(){return themeMode==1?Color.rgb(18,18,18):themeMode==2?Color.rgb(7,151,108):Color.WHITE;}
+  int textColor(){return themeMode==1?Color.WHITE:themeMode==2?Color.WHITE:Color.BLACK;}
+  int buttonColor(){return themeMode==1?Color.rgb(45,45,45):themeMode==2?Color.rgb(0,105,76):Color.rgb(235,241,239);}
+  void chooseTheme(){new AlertDialog.Builder(this).setTitle("Choose background").setItems(new String[]{"☀  Day","☾  Dark","₿  Bitcoin Cash Green"},(dialog,which)->{themeMode=which;getPreferences(0).edit().putInt("theme_mode",themeMode).apply();applyTheme();}).show();}
+  void applyTheme(){if(root==null)return;root.setBackgroundColor(pageColor());if(themeButton!=null){String title=themeMode==0?"Background: Day":themeMode==1?"Background: Dark":"Background: Bitcoin Cash";themeButton.setText(title);int icon=themeMode==0?R.drawable.ic_theme_day:themeMode==1?R.drawable.ic_theme_dark:R.drawable.ic_asset_bch;android.graphics.drawable.Drawable d=getDrawable(icon);d.setBounds(0,0,dp(24),dp(24));themeButton.setCompoundDrawables(d,null,null,null);themeButton.setCompoundDrawablePadding(dp(8));}applyThemeTo(root);}
+  void applyThemeTo(View view){if(view instanceof TextView){((TextView)view).setTextColor(textColor());}if(view instanceof Button){view.setBackgroundTintList(android.content.res.ColorStateList.valueOf(buttonColor()));}if(view instanceof LinearLayout){LinearLayout ll=(LinearLayout)view;if(ll==root)ll.setBackgroundColor(pageColor());else if(ll==items){}else if(ll.getOrientation()==LinearLayout.VERTICAL&&ll.getChildCount()>0)ll.setBackgroundColor(cardColor());}if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++)applyThemeTo(group.getChildAt(i));}}
+  @Override public void onCreate(Bundle b){super.onCreate(b);themeMode=getPreferences(0).getInt("theme_mode",0);try{assets=new JSONArray(getPreferences(0).getString(PREF,"[]"));}catch(Exception ignored){} build(); refresh();}
   void save(){getPreferences(0).edit().putString(PREF,assets.toString()).apply();}
   void build(){ScrollView scroll=new ScrollView(this);root=new LinearLayout(this);root.setPadding(dp(18),dp(20),dp(18),dp(20));root.setOrientation(1);root.setBackgroundColor(Color.rgb(244,249,247));scroll.addView(root);setContentView(scroll);
     root.addView(label("CashTokens Portfolio",26));root.addView(label("Watch-only • Stored on this device",13));total=label("Total: —",23);root.addView(total);status=label("Prices not loaded",12);root.addView(status);
@@ -35,7 +43,7 @@ public class MainActivity extends Activity {
   void render(){if(items==null)return;items.removeAllViews();double sum=0;boolean incomplete=false;
     for(int i=0;i<assets.length();i++){JSONObject a=assets.optJSONObject(i);if(a==null)continue;final int index=i;String k=key(a);Double price=prices.get(k);double qty=a.optDouble("quantity",0);String title=a.optString("name","Token");
       String val=price==null?"Price unavailable":String.format(Locale.US,"$%,.4f",qty*price);if(price==null)incomplete=true;else sum+=qty*price;
-      LinearLayout row=new LinearLayout(this);row.setOrientation(1);row.setPadding(dp(12),dp(8),dp(12),dp(8));row.setBackgroundColor(Color.WHITE);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(8);items.addView(row,lp);
+      LinearLayout row=new LinearLayout(this);row.setOrientation(1);row.setPadding(dp(12),dp(8),dp(12),dp(8));row.setBackgroundColor(cardColor());LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(8);items.addView(row,lp);
       LinearLayout titleRow=new LinearLayout(this);titleRow.setOrientation(0);titleRow.setGravity(Gravity.CENTER_VERTICAL);
       ImageView icon=new ImageView(this);int iconId;
       String assetType=a.optString("type");
