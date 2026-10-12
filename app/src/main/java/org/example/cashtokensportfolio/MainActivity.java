@@ -140,8 +140,14 @@ public class MainActivity extends Activity {
     android.graphics.Bitmap cached=cashTokenIconCache.get(category);if(cached!=null){target.setImageBitmap(cached);return;}
     synchronized(iconRequests){if(iconRequests.contains(category))return;iconRequests.add(category);}
     new Thread(()->{android.graphics.Bitmap bitmap=null;try{
-      Object meta=fetchAny("https://bcmr.paytaca.com/api/tokens/"+category.toLowerCase(Locale.US));
-      String uri=extractIconUri(meta);
+      String uri;
+      if("666879bad15bbfb73ebea2b238f2d07ac3fac5dbec96182a5a1dd213211de012".equalsIgnoreCase(category)){
+        // Use the exact SHIBCH icon URL published by TokenExplorer.cash.
+        uri="https://ipfs.filebase.io/ipfs/bafybeibezwnacrpoq4beqnecpsi2znronhqjidu4aijuy4tcqbv2u2frla/666879bad15bbfb73ebea2b238f2d07ac3fac5dbec96182a5a1dd213211de012.png";
+      }else{
+        Object meta=fetchAny("https://bcmr.paytaca.com/api/tokens/"+category.toLowerCase(Locale.US));
+        uri=extractIconUri(meta);
+      }
       if(uri!=null){String imageUrl=uri;
         if(imageUrl.startsWith("ipfs://")){String path=imageUrl.substring(7);if(path.startsWith("ipfs/"))path=path.substring(5);imageUrl="https://ipfs.io/ipfs/"+path;}
         if(imageUrl.startsWith("https://")||imageUrl.startsWith("http://")){
