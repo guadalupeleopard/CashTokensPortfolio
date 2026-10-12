@@ -559,13 +559,24 @@ public class MainActivity extends Activity {
       if(asset==null||!"CashToken".equals(asset.optString("type")))continue;
       String category=asset.optString("id").toLowerCase(Locale.US);
       try{
-        String url="https://tokenstork.com/api/tokens/"+category+"/history";
-        Object response=fetchAny(url);
-        Double sats=extractLatestHistorySats(response);
+        boolean stablecoin=isCauldronStablecoin(asset);
+        Double priceBch=null;
+        if(stablecoin){
+          // Cauldron's current-price value for these stablecoins is in micro-BCH units.
+          Object response=fetchAny("https://indexer.riften.net/cauldron/price/"+category+"/current");
+          if(response instanceof JSONObject){
+            double priceUnits=((JSONObject)response).optDouble("price",Double.NaN);
+            if(Double.isFinite(priceUnits)&&priceUnits>=0)priceBch=priceUnits/1000000d;
+          }
+        }else{
+          String url="https://tokenstork.com/api/tokens/"+category+"/history";
+          Object response=fetchAny(url);
+          Double sats=extractLatestHistorySats(response);
+          if(sats!=null)priceBch=sats/100000000d;
+        }
         Double bch=prices.get("BCH:bch");
-        if(sats!=null&&bch!=null){
-          double priceSatsEquivalent=sats*(isCauldronStablecoin(asset)?100d:1d);
-          double usd=priceSatsEquivalent/100000000d*bch;
+        if(priceBch!=null&&bch!=null){
+          double usd=priceBch*bch;
           if(Double.isFinite(usd)&&usd>=0){prices.put(key(asset),usd);found++;}else missing++;
         }else missing++;
       }catch(Exception e){missing++;}
