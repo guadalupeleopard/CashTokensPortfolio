@@ -594,16 +594,16 @@ public class MainActivity extends Activity {
       notes.append("CoinGecko OK. ");
     }catch(Exception e){notes.append("CoinGecko unavailable. ");}
     int found=0,missing=0;
-    // Main-page quotes use CauldronSwap's current-price endpoint, not its
-    // historical chart endpoint. Convert the returned BCH-denominated quote
-    // to USD using the current BCH/USD rate. Never substitute a historical
-    // observation for a current quote.
+    // Main-page quotes use CauldronSwap's documented /current endpoint, not
+    // the historical chart endpoint. Its JSON response contains a price field
+    // denominated in BCH satoshis. Convert to USD using the current BCH/USD
+    // rate. Never substitute a historical observation for a current quote.
     for(int i=0;i<assets.length();i++){
       JSONObject asset=assets.optJSONObject(i);
       if(asset==null||!"CashToken".equals(asset.optString("type")))continue;
       String category=asset.optString("id").toLowerCase(Locale.US);
       try{
-        String url="https://indexer.riften.net/cauldron/price/"+category;
+        String url="https://indexer.riften.net/cauldron/price/"+category+"/current";
         Object response=fetchAny(url);
         Double priceUnits=extractCurrentCauldronPrice(response);
         Double bch=prices.get("BCH:bch");
