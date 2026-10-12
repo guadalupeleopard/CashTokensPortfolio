@@ -594,10 +594,9 @@ public class MainActivity extends Activity {
       notes.append("CoinGecko OK. ");
     }catch(Exception e){notes.append("CoinGecko unavailable. ");}
     int found=0,missing=0;
-    // Main-page quotes use CauldronSwap's documented /current endpoint, not
-    // the historical chart endpoint. Its JSON response contains a price field
-    // denominated in BCH satoshis. Convert to USD using the current BCH/USD
-    // rate. Never substitute a historical observation for a current quote.
+    // Main-page quotes use CauldronSwap's current-price endpoint. The API
+    // price is per smallest token unit, so multiply by 10^token decimals to
+    // obtain satoshis per whole token before converting to USD.
     for(int i=0;i<assets.length();i++){
       JSONObject asset=assets.optJSONObject(i);
       if(asset==null||!"CashToken".equals(asset.optString("type")))continue;
@@ -606,9 +605,10 @@ public class MainActivity extends Activity {
         String url="https://indexer.riften.net/cauldron/price/"+category+"/current";
         Object response=fetchAny(url);
         Double priceUnits=extractCurrentCauldronPrice(response);
+        int decimals=fetchCauldronTokenDecimals(category);
         Double bch=prices.get("BCH:bch");
-        if(priceUnits!=null&&bch!=null){
-          double sats=priceUnits*(isCauldronStablecoin(asset)?100d:1d);
+        if(priceUnits!=null&&decimals>=0&&decimals<=18&&bch!=null){
+          double sats=priceUnits*Math.pow(10d,decimals);
           double usd=(sats/100000000d)*bch;
           if(Double.isFinite(usd)&&usd>0){prices.put(key(asset),usd);found++;}else missing++;
         }else missing++;
@@ -723,6 +723,39 @@ public class MainActivity extends Activity {
     }).start();
     target.setTag(category);
   }
+
+  // Read decimals only from CauldronSwap's own BCMR endpoint. A missing
+  // decimals field is treated as unavailable instead of silently guessing.
+  int fetchCauldronTokenDecimals(String category)throws Exception{
+    Object metadata=fetchAny("https://indexer.riften.net/bcmr/token/"+category);
+    return extractCauldronTokenDecimals(metadata);
+  }
+  int extractCauldronTokenDecimals(Object data){
+    if(data instanceof JSONObject){
+      JSONObject o=(JSONObject)data;
+      JSONObject token=o.optJSONObject("token");
+      if(token!=null&&token.has("decimals")&&!token.isNull("decimals")){
+        int decimals=token.optInt("decimals",-1);
+        if(decimals>=0)return decimals;
+      }
+      if(o.has("decimals")&&!o.isNull("decimals")){
+        int decimals=o.optInt("decimals",-1);
+        if(decimals>=0)return decimals;
+      }
+      for(String field:new String[]{"data","result","metadata","identity","snapshot","registry","token"}){
+        int decimals=extractCauldronTokenDecimals(o.opt(field));
+        if(decimals>=0)return decimals;
+      }
+    }else if(data instanceof JSONArray){
+      JSONArray a=(JSONArray)data;
+      for(int i=0;i<a.length();i++){
+        int decimals=extractCauldronTokenDecimals(a.opt(i));
+        if(decimals>=0)return decimals;
+      }
+    }
+    return -1;
+  }
+
   Double extractCurrentCauldronPrice(Object data){
     if(data instanceof JSONObject){
       JSONObject o=(JSONObject)data;
