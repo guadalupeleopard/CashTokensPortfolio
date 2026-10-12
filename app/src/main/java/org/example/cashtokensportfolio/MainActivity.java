@@ -297,7 +297,7 @@ public class MainActivity extends Activity {
     LinearLayout header=new LinearLayout(this);header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);
     Button back=new Button(this);back.setText("← Back");back.setOnClickListener(v->{assetHistoryOpen=false;build();});header.addView(back);
     TextView title=label(asset.optString("name","Asset")+" Price History",20);header.addView(title,new LinearLayout.LayoutParams(0,-2,1f));page.addView(header);
-    page.addView(label("BCH, Pi and USDT: USD market history. CashTokens: CauldronSwap prices in BCH satoshis.",14));
+    page.addView(label("BCH and Pi: Binance daily close prices in USDT. USDT: estimated USD peg from the USDC/USDT pair. CashTokens: CauldronSwap prices in BCH satoshis.",14));
     LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.HORIZONTAL);page.addView(controls);
     TextView statusText=label("Loading historical prices…",14);page.addView(statusText);
     FrameLayout graphHolder=new FrameLayout(this);page.addView(graphHolder,new LinearLayout.LayoutParams(-1,dp(300)));
@@ -309,23 +309,27 @@ public class MainActivity extends Activity {
       try{
         if("CashToken".equalsIgnoreCase(asset.optString("type"))){
           String token=asset.optString("id").toLowerCase(Locale.US);long now=System.currentTimeMillis()/1000L;
-          Object result=fetchAny("https://indexer.riften.net/cauldron/price/"+token+"/history?start=0&end="+now+"&stepsize=86400");
+          Object result=fetchAny("https://indexer.riften.net/cauldron/price/"+token+"/history?start=1&end="+now+"&stepsize=86400");
           if(result instanceof JSONObject){JSONArray points=((JSONObject)result).optJSONArray("history");if(points!=null)for(int i=0;i<points.length();i++){JSONObject p=points.optJSONObject(i);if(p==null)continue;long time=p.optLong("time",0);double sats=p.optDouble("avg",Double.NaN);if(time>0&&Double.isFinite(sats)&&sats>=0){ts.add(time*1000L);ps.add(sats);}}}
         }else{
-          String id="bitcoin-cash";String type=asset.optString("type","").toUpperCase(Locale.US);
-          if(type.equals("PI"))id="pi-network";else if(type.equals("USDT"))id="tether";
-          // CoinPaprika's free historical OHLCV tier only allows the last 24 hours.
-          // Use CoinGecko market_chart for long-range daily history instead.
-          Object response=fetchAny("https://api.coingecko.com/api/v3/coins/"+id+"/market_chart?vs_currency=usd&days=max");
-          JSONArray points=null;
-          if(response instanceof JSONObject)points=((JSONObject)response).optJSONArray("prices");
+          String symbol="BCHUSDT";String type=asset.optString("type","").toUpperCase(Locale.US);
+          if(type.equals("PI"))symbol="PIUSDT";
+          else if(type.equals("USDT"))symbol="USDCUSDT";
+          // Use public Binance daily candles to avoid CoinGecko API-key authorization errors.
+          // Binance returns at most 1000 daily candles per request.
+          Object response=fetchAny("https://api.binance.com/api/v3/klines?symbol="+symbol+"&interval=1d&limit=1000");
+          JSONArray points=response instanceof JSONArray?(JSONArray)response:null;
           if(points!=null)for(int i=0;i<points.length();i++){
-            JSONArray p=points.optJSONArray(i);if(p==null||p.length()<2)continue;
-            long time=p.optLong(0,0);double price=p.optDouble(1,Double.NaN);
-            if(time>0&&Double.isFinite(price)&&price>=0){ts.add(time);ps.add(price);}
+            JSONArray p=points.optJSONArray(i);if(p==null||p.length()<5)continue;
+            long time=p.optLong(0,0);double close;
+            try{close=Double.parseDouble(p.optString(4,"NaN"));}catch(Exception ex){continue;}
+            if(time>0&&Double.isFinite(close)&&close>=0){
+              if(type.equals("USDT")&&close>0)close=1.0/close;
+              ts.add(time);ps.add(close);
+            }
           }
         }
-      }catch(Exception e){failure="Could not load price history ("+e.getMessage()+"). Check your internet connection or try again later.";}
+      }catch(Exception e){failure="Could not load price history: "+e.getMessage()+". The selected provider may be unavailable or the asset pair may not exist.";}
       final String err=failure;
       runOnUiThread(()->{
         timestamps.addAll(ts);priceValues.addAll(ps);
