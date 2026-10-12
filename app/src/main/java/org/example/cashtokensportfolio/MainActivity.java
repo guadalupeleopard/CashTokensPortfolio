@@ -295,7 +295,7 @@ public class MainActivity extends Activity {
     ScrollView scroll=new ScrollView(this);
     LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setPadding(dp(18),dp(12),dp(18),dp(24));page.setBackgroundColor(pageColor());scroll.addView(page);
     LinearLayout header=new LinearLayout(this);header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);
-    Button back=new Button(this);back.setText("← Back");back.setOnClickListener(v->{assetHistoryOpen=false;build();});header.addView(back);
+    Button back=new Button(this);back.setText("← Back");back.setOnClickListener(v->{assetHistoryOpen=false;showHistoryPage();});header.addView(back);
     TextView title=label(asset.optString("name","Asset")+" Price History",20);header.addView(title,new LinearLayout.LayoutParams(0,-2,1f));page.addView(header);
     page.addView(label("CashToken historical prices from CauldronSwap, quoted in BCH satoshis.",14));
     LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.HORIZONTAL);page.addView(controls);
