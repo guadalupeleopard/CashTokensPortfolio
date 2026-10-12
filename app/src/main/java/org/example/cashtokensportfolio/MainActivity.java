@@ -182,9 +182,10 @@ public class MainActivity extends Activity {
   int chartAssetPreferredColor(JSONObject a){
     String type=a.optString("type","").toUpperCase(Locale.US);
     String name=a.optString("name","").toLowerCase(Locale.US);
-    if(type.equals("BCH")||name.contains("bitcoin cash"))return Color.rgb(12,193,142);
-    if(type.equals("PI")||name.equals("pi")||name.contains("pi network"))return Color.rgb(123,78,200);
-    if(type.equals("USDT")||name.contains("tether"))return Color.rgb(38,161,123);
+    if(isBchChartAsset(a))return Color.rgb(12,193,142);
+    if(isPiChartAsset(a))return Color.rgb(123,78,200);
+    if(isUsdtChartAsset(a))return Color.rgb(255,193,7);
+    if(isShibChartAsset(a))return Color.rgb(255,145,0);
     if(name.contains("shibch"))return Color.rgb(239,91,52);
     if(name.contains("moria")||name.contains("musd"))return Color.rgb(42,119,210);
     if(name.contains("ethereum")||name.equals("eth"))return Color.rgb(98,126,234);
@@ -199,18 +200,29 @@ public class MainActivity extends Activity {
     String type=a.optString("type","");String name=a.optString("name","").toLowerCase(Locale.US);
     return type.equalsIgnoreCase("PI")||name.equals("pi")||name.contains("pi network");
   }
+  boolean isUsdtChartAsset(JSONObject a){
+    String type=a.optString("type","");String name=a.optString("name","").toLowerCase(Locale.US);
+    return type.equalsIgnoreCase("USDT")||name.equals("usdt")||name.contains("tether");
+  }
+  boolean isShibChartAsset(JSONObject a){
+    String type=a.optString("type","").toUpperCase(Locale.US);String name=a.optString("name","").toLowerCase(Locale.US);
+    return type.equals("SHIB")||name.equals("shib")||name.contains("shiba inu");
+  }
   String chartColorKey(JSONObject a){return key(a);}
   HashMap<String,Integer> ensureUniqueChartColors(){
-    final int bchGreen=Color.rgb(12,193,142), piPurple=Color.rgb(123,78,200);
+    final int bchGreen=Color.rgb(12,193,142), piPurple=Color.rgb(123,78,200),
+      usdtYellow=Color.rgb(255,193,7), shibOrange=Color.rgb(255,145,0);
     android.content.SharedPreferences prefs=getSharedPreferences(PREF+"_chart_colors",MODE_PRIVATE);
     HashMap<String,Integer> assigned=new HashMap<>();
     HashSet<Integer> used=new HashSet<>();
-    // Reserve signature colors first so BCH is always green and Pi is always purple.
+    // Reserve signature colors first so BCH, Pi, USDT, and Shiba Inu keep their requested colors.
     for(int i=0;i<assets.length();i++){
       JSONObject a=assets.optJSONObject(i);if(a==null)continue;
       String k=chartColorKey(a);
       if(isBchChartAsset(a)){assigned.put(k,bchGreen);used.add(bchGreen);}
       else if(isPiChartAsset(a)){assigned.put(k,piPurple);used.add(piPurple);}
+      else if(isUsdtChartAsset(a)){assigned.put(k,usdtYellow);used.add(usdtYellow);}
+      else if(isShibChartAsset(a)){assigned.put(k,shibOrange);used.add(shibOrange);}
     }
     // Keep each previously saved color when it is still unique.
     for(int i=0;i<assets.length();i++){
@@ -227,7 +239,7 @@ public class MainActivity extends Activity {
       String k=chartColorKey(a);if(assigned.containsKey(k))continue;
       int preferred=chartAssetPreferredColor(a);
       int chosen=Color.TRANSPARENT;
-      if(preferred!=bchGreen&&preferred!=piPurple&&!used.contains(preferred))chosen=preferred;
+      if(preferred!=bchGreen&&preferred!=piPurple&&preferred!=usdtYellow&&preferred!=shibOrange&&!used.contains(preferred))chosen=preferred;
       if(chosen==Color.TRANSPARENT){
         int[][] alternatives={
           {Color.rgb(247,147,26),Color.rgb(230,126,34),Color.rgb(255,193,7),Color.rgb(190,100,35)},
@@ -238,11 +250,11 @@ public class MainActivity extends Activity {
           {Color.rgb(233,30,99),Color.rgb(0,150,136),Color.rgb(63,81,181),Color.rgb(121,134,203)}
         };
         int group=Math.floorMod((a.optString("type","")+a.optString("name","")).hashCode(),alternatives.length);
-        for(int c:alternatives[group])if(!used.contains(c)&&c!=bchGreen&&c!=piPurple){chosen=c;break;}
+        for(int c:alternatives[group])if(!used.contains(c)&&c!=bchGreen&&c!=piPurple&&c!=usdtYellow&&c!=shibOrange){chosen=c;break;}
       }
       if(chosen==Color.TRANSPARENT){
         int[] palette={Color.rgb(255,193,7),Color.rgb(0,188,212),Color.rgb(233,30,99),Color.rgb(103,58,183),Color.rgb(121,85,72),Color.rgb(96,125,139),Color.rgb(205,220,57),Color.rgb(255,87,34),Color.rgb(63,81,181),Color.rgb(0,150,136),Color.rgb(156,39,176),Color.rgb(121,134,203)};
-        for(int c:palette)if(!used.contains(c)&&c!=bchGreen&&c!=piPurple){chosen=c;break;}
+        for(int c:palette)if(!used.contains(c)&&c!=bchGreen&&c!=piPurple&&c!=usdtYellow&&c!=shibOrange){chosen=c;break;}
       }
       if(chosen==Color.TRANSPARENT){
         for(int hue=0;hue<360;hue++){int c=Color.HSVToColor(new float[]{hue,0.78f,0.92f});if(!used.contains(c)&&c!=bchGreen&&c!=piPurple){chosen=c;break;}}
