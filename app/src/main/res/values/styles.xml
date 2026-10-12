@@ -3,6 +3,6 @@
     <style name="Theme.CashTrack" parent="@android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowSplashScreenBackground">#FFFFFF</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/cashtrack_icon</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/cashtrack_splash_icon</item>
     </style>
 </resources>
