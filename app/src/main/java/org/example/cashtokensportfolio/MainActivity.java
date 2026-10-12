@@ -334,7 +334,13 @@ public class MainActivity extends Activity {
     }).start();
     setContentView(scroll);applyThemeTo(page);
   }
-  // Cauldron prices for these USD stablecoins are expressed in micro-BCH units; convert to satoshi-equivalent values (x100) for charting and USD conversion.\n  boolean isCauldronStablecoin(JSONObject asset){\n    if(asset==null)return false;\n    String name=asset.optString("name","").toLowerCase(Locale.US).replaceAll("[^a-z0-9]","");\n    return name.equals("paryonusd")||name.equals("paryon")||name.equals("pusd")||name.equals("moriausd")||name.equals("moria")||name.equals("musd");\n  }\n  String bundledHistoryFile(JSONObject asset){
+  // Cauldron prices for these USD stablecoins are expressed in micro-BCH units; convert to satoshi-equivalent values (x100) for charting and USD conversion.
+  boolean isCauldronStablecoin(JSONObject asset){
+    if(asset==null)return false;
+    String name=asset.optString("name","").toLowerCase(Locale.US).replaceAll("[^a-z0-9]","");
+    return name.equals("paryonusd")||name.equals("paryon")||name.equals("pusd")||name.equals("moriausd")||name.equals("moria")||name.equals("musd");
+  }
+  String bundledHistoryFile(JSONObject asset){
     String name=asset.optString("name","").toLowerCase(Locale.US).replaceAll("[^a-z0-9]","");
     if(name.equals("shibch")||name.equals("shibainu")||name.equals("shib")||name.equals("shibainucashtoken"))return "shibch_daily.json";
     if(name.equals("furu")||name.equals("furutoken")||name.equals("furutokens"))return "furu_daily.json";
@@ -558,7 +564,8 @@ public class MainActivity extends Activity {
         Double sats=extractLatestHistorySats(response);
         Double bch=prices.get("BCH:bch");
         if(sats!=null&&bch!=null){
-          double priceSatsEquivalent=sats*(isCauldronStablecoin(asset)?100d:1d);\n          double usd=priceSatsEquivalent/100000000d*bch;
+          double priceSatsEquivalent=sats*(isCauldronStablecoin(asset)?100d:1d);
+          double usd=priceSatsEquivalent/100000000d*bch;
           if(Double.isFinite(usd)&&usd>=0){prices.put(key(asset),usd);found++;}else missing++;
         }else missing++;
       }catch(Exception e){missing++;}
