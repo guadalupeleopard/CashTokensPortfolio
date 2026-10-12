@@ -108,10 +108,31 @@ public class MainActivity extends Activity {
     return null;
   }
   String extractIconUri(Object value){
-    if(value instanceof JSONObject){JSONObject o=(JSONObject)value;JSONObject u=o.optJSONObject("uris");if(u!=null){String s=u.optString("icon","");if(!s.isEmpty()&&!"null".equals(s))return s;}
-      String direct=o.optString("icon","");if(direct.startsWith("http")||direct.startsWith("ipfs://"))return direct;
-      for(String field:new String[]{"token","identity","snapshot","metadata","data","result","registry","identities","tokens"}){String s=extractIconUri(o.opt(field));if(s!=null)return s;}
-    }else if(value instanceof JSONArray){JSONArray a=(JSONArray)value;for(int i=0;i<a.length();i++){String s=extractIconUri(a.opt(i));if(s!=null)return s;}}
+    // BCMR indexer responses can nest snapshots under registry-specific keys.
+    // Walk every object field instead of assuming a fixed response shape.
+    if(value instanceof JSONObject){
+      JSONObject o=(JSONObject)value;
+      JSONObject u=o.optJSONObject("uris");
+      if(u!=null){
+        String s=u.optString("icon","");
+        if(!s.isEmpty()&&!"null".equals(s))return s.trim();
+      }
+      String direct=o.optString("icon","");
+      if(!direct.isEmpty()&&!"null".equals(direct))return direct.trim();
+      Iterator<String> keys=o.keys();
+      while(keys.hasNext()){
+        String field=keys.next();
+        if("icon".equalsIgnoreCase(field))continue;
+        String found=extractIconUri(o.opt(field));
+        if(found!=null)return found;
+      }
+    }else if(value instanceof JSONArray){
+      JSONArray a=(JSONArray)value;
+      for(int i=0;i<a.length();i++){
+        String found=extractIconUri(a.opt(i));
+        if(found!=null)return found;
+      }
+    }
     return null;
   }
   void loadCashTokenIcon(ImageView target,String category){
