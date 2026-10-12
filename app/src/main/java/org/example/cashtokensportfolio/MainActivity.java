@@ -4,6 +4,7 @@ import android.app.*;
 import android.os.*;
 import android.content.*;
 import android.graphics.Color;
+import android.graphics.BitmapFactory;
 import android.view.*;
 import android.widget.*;
 import org.json.*;
@@ -16,6 +17,8 @@ public class MainActivity extends Activity {
   LinearLayout root, items; TextView total, status; JSONArray assets = new JSONArray();
   final HashMap<String, Double> prices = new HashMap<>();
   final HashMap<String, String> ids = new HashMap<>();
+  final HashMap<String, android.graphics.Bitmap> cashTokenIconCache = new HashMap<>();
+  final HashSet<String> iconRequests = new HashSet<>();
   final String PREF="portfolio";
   int dp(float n){return (int)(n*getResources().getDisplayMetrics().density+.5f);}
   TextView label(String s,int size){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(Color.rgb(20,40,43));t.setPadding(dp(4),dp(10),dp(4),dp(10));return t;}
@@ -38,7 +41,7 @@ public class MainActivity extends Activity {
       else if("USDT".equalsIgnoreCase(assetType))iconId=R.drawable.ic_asset_usdt;
       else iconId=R.drawable.ic_asset_cashtoken;
       LinearLayout.LayoutParams iconLp=new LinearLayout.LayoutParams(dp(22),dp(22));iconLp.rightMargin=dp(7);
-      icon.setImageResource(iconId);icon.setScaleType(ImageView.ScaleType.FIT_CENTER);titleRow.addView(icon,iconLp);
+      icon.setImageResource(iconId);icon.setScaleType(ImageView.ScaleType.FIT_CENTER);titleRow.addView(icon,iconLp);if("CashToken".equalsIgnoreCase(assetType))loadCashTokenIcon(icon,a.optString("id"));
       TextView assetTitle=label(title+" ("+assetType+")",18);assetTitle.setPadding(dp(2),dp(8),dp(4),dp(8));titleRow.addView(assetTitle);
       row.addView(titleRow);row.addView(label("Quantity: "+a.optString("quantity")+"   •   "+val,15));
       addButton(row,"Edit / Remove",()->editDialog(index));
@@ -80,6 +83,44 @@ public class MainActivity extends Activity {
     notes.append("CashTokens priced: ").append(found).append("; unavailable: ").append(missing);
     final String message=notes.toString();runOnUiThread(()->{status.setText(message);render();});
   }).start();}
+
+  // Resolve the category's BCMR metadata and use its published icon when available.
+  // Paytaca's public BCMR indexer resolves on-chain metadata by CashToken category.
+  JSONObject findIconObject(Object value){
+    if(value instanceof JSONObject){JSONObject o=(JSONObject)value;
+      Object uris=o.opt("uris");if(uris instanceof JSONObject){JSONObject u=(JSONObject)uris;String icon=u.optString("icon","");if(!icon.isEmpty()&&!"null".equals(icon))return u;}
+      String direct=o.optString("icon","");if(!direct.isEmpty()&&direct.startsWith("http"))return o;
+      for(String field:new String[]{"token","identity","snapshot","metadata","data","result","registry","identities","uris"}){JSONObject found=findIconObject(o.opt(field));if(found!=null)return found;}
+      JSONArray names=o.optJSONArray("identities");if(names!=null){for(int i=0;i<names.length();i++){JSONObject found=findIconObject(names.opt(i));if(found!=null)return found;}}
+    }else if(value instanceof JSONArray){JSONArray arr=(JSONArray)value;for(int i=0;i<arr.length();i++){JSONObject found=findIconObject(arr.opt(i));if(found!=null)return found;}}
+    return null;
+  }
+  String extractIconUri(Object value){
+    if(value instanceof JSONObject){JSONObject o=(JSONObject)value;JSONObject u=o.optJSONObject("uris");if(u!=null){String s=u.optString("icon","");if(!s.isEmpty()&&!"null".equals(s))return s;}
+      String direct=o.optString("icon","");if(direct.startsWith("http")||direct.startsWith("ipfs://"))return direct;
+      for(String field:new String[]{"token","identity","snapshot","metadata","data","result","registry","identities","tokens"}){String s=extractIconUri(o.opt(field));if(s!=null)return s;}
+    }else if(value instanceof JSONArray){JSONArray a=(JSONArray)value;for(int i=0;i<a.length();i++){String s=extractIconUri(a.opt(i));if(s!=null)return s;}}
+    return null;
+  }
+  void loadCashTokenIcon(ImageView target,String category){
+    if(category==null||!category.matches("(?i)[a-f0-9]{64}"))return;
+    android.graphics.Bitmap cached=cashTokenIconCache.get(category);if(cached!=null){target.setImageBitmap(cached);return;}
+    synchronized(iconRequests){if(iconRequests.contains(category))return;iconRequests.add(category);}
+    new Thread(()->{android.graphics.Bitmap bitmap=null;try{
+      Object meta=fetchAny("https://bcmr.paytaca.com/api/tokens/"+category.toLowerCase(Locale.US));
+      String uri=extractIconUri(meta);
+      if(uri!=null){String imageUrl=uri;
+        if(imageUrl.startsWith("ipfs://")){String path=imageUrl.substring(7);if(path.startsWith("ipfs/"))path=path.substring(5);imageUrl="https://ipfs.io/ipfs/"+path;}
+        if(imageUrl.startsWith("https://")||imageUrl.startsWith("http://")){
+          HttpURLConnection conn=(HttpURLConnection)new URL(imageUrl).openConnection();conn.setConnectTimeout(10000);conn.setReadTimeout(10000);conn.setInstanceFollowRedirects(true);conn.setRequestProperty("User-Agent","CashTokensPortfolio/1.2");
+          try(InputStream in=conn.getInputStream()){bitmap=BitmapFactory.decodeStream(in);}finally{conn.disconnect();}
+        }
+      }
+    }catch(Exception ignored){}finally{synchronized(iconRequests){iconRequests.remove(category);}}
+      if(bitmap!=null){cashTokenIconCache.put(category,bitmap);android.graphics.Bitmap result=bitmap;runOnUiThread(()->{if(target.getTag()==null||category.equals(target.getTag()))target.setImageBitmap(result);});}
+    }).start();
+    target.setTag(category);
+  }
   Double extractLatestHistorySats(Object data){
     if(!(data instanceof JSONObject))return null;
     JSONArray points=((JSONObject)data).optJSONArray("points");
