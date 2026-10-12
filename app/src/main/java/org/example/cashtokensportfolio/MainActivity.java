@@ -129,7 +129,7 @@ public class MainActivity extends Activity {
         }
       }
     }catch(Exception ignored){}finally{synchronized(iconRequests){iconRequests.remove(category);}}
-      if(bitmap!=null){cashTokenIconCache.put(category,bitmap);android.graphics.Bitmap result=bitmap;runOnUiThread(()->{if(target.getTag()==null||category.equals(target.getTag()))target.setImageBitmap(result);});}
+      if(bitmap!=null){cashTokenIconCache.put(category,bitmap);runOnUiThread(()->{if(!isFinishing())render();});}
     }).start();
     target.setTag(category);
   }
