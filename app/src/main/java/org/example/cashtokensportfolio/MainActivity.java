@@ -151,33 +151,67 @@ public class MainActivity extends Activity {
     LinearLayout header=new LinearLayout(this);header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);ImageView appLogo=new ImageView(this);appLogo.setImageResource(R.drawable.cashtrack_icon);appLogo.setScaleType(ImageView.ScaleType.FIT_CENTER);LinearLayout.LayoutParams appLogoLp=new LinearLayout.LayoutParams(dp(48),dp(48));appLogoLp.rightMargin=dp(12);header.addView(appLogo,appLogoLp);TextView heading=label("CashTokens Portfolio",26);LinearLayout.LayoutParams headingLp=new LinearLayout.LayoutParams(0,-2,1f);header.addView(heading,headingLp);chartButton=new Button(this);chartButton.setText("▥");chartButton.setTextSize(22);chartButton.setMinWidth(0);chartButton.setMinimumWidth(0);chartButton.setPadding(dp(8),dp(4),dp(8),dp(4));chartButton.setContentDescription("Open portfolio chart");header.addView(chartButton);chartButton.setOnClickListener(v->showChart());themeButton=new Button(this);themeButton.setText("☰");themeButton.setTextSize(22);themeButton.setMinWidth(0);themeButton.setMinimumWidth(0);themeButton.setPadding(dp(10),dp(4),dp(10),dp(4));themeButton.setContentDescription("Open menu");header.addView(themeButton);themeButton.setOnClickListener(v->openMenu());root.addView(header);root.addView(label("Watch-only • Stored on this device",13));total=label("Total: —",23);root.addView(total);status=label("Prices not loaded",12);root.addView(status);
     addButton(root,"+ Add asset",this::addAssetDialog);addButton(root,"Refresh market prices",this::refresh);items=new LinearLayout(this);items.setOrientation(1);root.addView(items);render();}
 
+  int chartAssetColor(JSONObject a){
+    String type=a.optString("type","").toUpperCase(Locale.US);
+    String name=a.optString("name","").toLowerCase(Locale.US);
+    if(type.equals("BCH")||name.contains("bitcoin cash"))return Color.rgb(12,193,142);
+    if(type.equals("PI")||name.equals("pi")||name.contains("pi network"))return Color.rgb(123,78,200);
+    if(type.equals("USDT")||name.contains("tether"))return Color.rgb(38,161,123);
+    if(name.contains("shibch"))return Color.rgb(239,91,52);
+    if(name.contains("moria")||name.contains("musd"))return Color.rgb(42,119,210);
+    if(name.contains("ethereum")||name.equals("eth"))return Color.rgb(98,126,234);
+    if(name.contains("bitcoin")||name.equals("btc"))return Color.rgb(247,147,26);
+    // Stable, asset-specific fallback color for CashTokens and other assets.
+    int hash=(a.optString("type","")+":"+a.optString("id","")+":"+a.optString("name","")).hashCode();
+    float hue=Math.floorMod(hash,360);
+    return Color.HSVToColor(new float[]{hue,0.72f,0.88f});
+  }
   void showChart(){
     ScrollView scroll=new ScrollView(this);
     LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setPadding(dp(18),dp(16),dp(18),dp(24));page.setBackgroundColor(pageColor());scroll.addView(page);
     LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);header.setOrientation(LinearLayout.HORIZONTAL);
     Button back=new Button(this);back.setText("← Back");back.setContentDescription("Back to assets");header.addView(back);back.setOnClickListener(v->build());
     TextView title=label("Portfolio Chart",23);LinearLayout.LayoutParams titleLp=new LinearLayout.LayoutParams(0,-2,1f);titleLp.leftMargin=dp(12);header.addView(title,titleLp);page.addView(header);
-    page.addView(label("Asset allocation by current known value",14));
+    page.addView(label("3D asset allocation by current known value",14));
     ArrayList<String> names=new ArrayList<>();ArrayList<Double> values=new ArrayList<>();ArrayList<Integer> colors=new ArrayList<>();double sum=0;
-    int[] palette={Color.rgb(0,150,136),Color.rgb(33,150,243),Color.rgb(255,152,0),Color.rgb(156,39,176),Color.rgb(244,67,54),Color.rgb(139,195,74),Color.rgb(63,81,181),Color.rgb(121,85,72),Color.rgb(0,188,212),Color.rgb(233,30,99)};
-    for(int i=0;i<assets.length();i++){JSONObject a=assets.optJSONObject(i);if(a==null)continue;Double price=prices.get(key(a));double qty=a.optDouble("quantity",0);if(price==null||!Double.isFinite(price)||price<0||qty<=0)continue;double value=qty*price;if(!Double.isFinite(value)||value<=0)continue;names.add(a.optString("name","Asset")+" ("+a.optString("type","")+")");values.add(value);colors.add(palette[(names.size()-1)%palette.length]);sum+=value;}
+    for(int i=0;i<assets.length();i++){JSONObject a=assets.optJSONObject(i);if(a==null)continue;Double price=prices.get(key(a));double qty=a.optDouble("quantity",0);if(price==null||!Double.isFinite(price)||price<0||qty<=0)continue;double value=qty*price;if(!Double.isFinite(value)||value<=0)continue;names.add(a.optString("name","Asset")+" ("+a.optString("type","")+")");values.add(value);colors.add(chartAssetColor(a));sum+=value;}
     if(values.isEmpty()){TextView empty=label("No priced assets with a positive value are available to chart yet. Add assets and refresh market prices, then return here.",16);page.addView(empty);setContentView(scroll);applyThemeTo(page);return;}
     final double chartTotal=sum;
-    PieChartView pie=new PieChartView(this,values,colors,chartTotal);LinearLayout.LayoutParams pieLp=new LinearLayout.LayoutParams(-1,dp(280));pieLp.topMargin=dp(8);page.addView(pie,pieLp);
+    PieChartView pie=new PieChartView(this,values,colors,chartTotal);LinearLayout.LayoutParams pieLp=new LinearLayout.LayoutParams(-1,dp(300));pieLp.topMargin=dp(8);page.addView(pie,pieLp);
     TextView selected=label("Total charted value: "+formatValue(chartTotal),17);page.addView(selected);
-    TextView instruction=label("Tap a slice or an asset below to see its percentage.",13);page.addView(instruction);
-    for(int i=0;i<names.size();i++){final int index=i;LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(8),dp(5),dp(8),dp(5));View swatch=new View(this);swatch.setBackgroundColor(colors.get(i));LinearLayout.LayoutParams swatchLp=new LinearLayout.LayoutParams(dp(14),dp(14));swatchLp.rightMargin=dp(10);row.addView(swatch,swatchLp);TextView name=label(names.get(i),15);LinearLayout.LayoutParams nameLp=new LinearLayout.LayoutParams(0,-2,1f);row.addView(name,nameLp);TextView percent=label(String.format(Locale.US,"%.2f%%",values.get(i)/chartTotal*100),15);row.addView(percent);row.setOnClickListener(v->{selectedChartSlice=index;pie.setSelected(index);selected.setText(names.get(index)+"\nValue: "+formatValue(values.get(index))+"\nPortfolio share: "+String.format(Locale.US,"%.2f%%",values.get(index)/chartTotal*100));});page.addView(row);View divider=new View(this);divider.setBackgroundColor(themeMode==1?Color.DKGRAY:Color.LTGRAY);page.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));}
-    pie.setOnSliceSelected(index->{if(index>=0&&index<names.size()){selectedChartSlice=index;selected.setText(names.get(index)+"\nValue: "+formatValue(values.get(index))+"\nPortfolio share: "+String.format(Locale.US,"%.2f%%",values.get(index)/chartTotal*100));}});
+    TextView instruction=label("Tap a 3D slice or an asset below. Both selections stay synchronized.",13);page.addView(instruction);
+    ArrayList<LinearLayout> chartRows=new ArrayList<>();
+    final Runnable[] syncRows={()->{for(int j=0;j<chartRows.size();j++){chartRows.get(j).setBackgroundColor(j==pie.selected?buttonColor():pageColor());}}};
+    for(int i=0;i<names.size();i++){final int index=i;LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(8),dp(5),dp(8),dp(5));row.setBackgroundColor(pageColor());View swatch=new View(this);swatch.setBackgroundColor(colors.get(i));LinearLayout.LayoutParams swatchLp=new LinearLayout.LayoutParams(dp(14),dp(14));swatchLp.rightMargin=dp(10);row.addView(swatch,swatchLp);TextView name=label(names.get(i),15);LinearLayout.LayoutParams nameLp=new LinearLayout.LayoutParams(0,-2,1f);row.addView(name,nameLp);TextView percent=label(String.format(Locale.US,"%.2f%%",values.get(i)/chartTotal*100),15);row.addView(percent);row.setOnClickListener(v->{pie.setSelected(index);syncRows[0].run();selected.setText(names.get(index)+"\nValue: "+formatValue(values.get(index))+"\nPortfolio share: "+String.format(Locale.US,"%.2f%%",values.get(index)/chartTotal*100));});chartRows.add(row);page.addView(row);View divider=new View(this);divider.setBackgroundColor(themeMode==1?Color.DKGRAY:Color.LTGRAY);page.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));}
+    pie.setOnSliceSelected(index->{if(index>=0&&index<names.size()){selected.setText(names.get(index)+"\nValue: "+formatValue(values.get(index))+"\nPortfolio share: "+String.format(Locale.US,"%.2f%%",values.get(index)/chartTotal*100));syncRows[0].run();}});
     setContentView(scroll);applyThemeTo(page);
   }
   interface SliceListener{void onSelected(int index);}
   class PieChartView extends View{
     final ArrayList<Double> values;final ArrayList<Integer> colors;final double total;final android.graphics.Paint paint=new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);final android.graphics.RectF oval=new android.graphics.RectF();SliceListener listener;int selected=-1;
-    PieChartView(Context context,ArrayList<Double> v,ArrayList<Integer> c,double t){super(context);values=v;colors=c;total=t;setContentDescription("Interactive pie chart of portfolio asset percentages");}
+    PieChartView(Context context,ArrayList<Double> v,ArrayList<Integer> c,double t){super(context);values=v;colors=c;total=t;setContentDescription("Interactive 3D pie chart of portfolio asset percentages");setLayerType(View.LAYER_TYPE_SOFTWARE,null);}
     void setOnSliceSelected(SliceListener l){listener=l;}
-    void setSelected(int i){selected=i;invalidate();}
-    @Override protected void onDraw(Canvas canvas){super.onDraw(canvas);float size=Math.min(getWidth()-dp(24),getHeight()-dp(24));if(size<=0)return;float left=(getWidth()-size)/2f,top=(getHeight()-size)/2f;oval.set(left,top,left+size,top+size);float start=-90f;for(int i=0;i<values.size();i++){float sweep=(float)(values.get(i)/total*360d);paint.setColor(colors.get(i));paint.setStyle(android.graphics.Paint.Style.FILL);if(i==selected){float mid=(float)Math.toRadians(start+sweep/2);float dx=(float)Math.cos(mid)*dp(7),dy=(float)Math.sin(mid)*dp(7);android.graphics.RectF shifted=new android.graphics.RectF(oval);shifted.offset(dx,dy);canvas.drawArc(shifted,start,sweep,true,paint);}else canvas.drawArc(oval,start,sweep,true,paint);start+=sweep;}if(selected>=0&&selected<values.size()){paint.setColor(textColor());paint.setTextAlign(android.graphics.Paint.Align.CENTER);paint.setTextSize(dp(14));canvas.drawText(String.format(Locale.US,"%.2f%%",values.get(selected)/total*100),getWidth()/2f,getHeight()-dp(3),paint);}}
-    @Override public boolean onTouchEvent(android.view.MotionEvent event){if(event.getAction()!=MotionEvent.ACTION_UP)return true;float size=Math.min(getWidth()-dp(24),getHeight()-dp(24));float cx=getWidth()/2f,cy=(getHeight()-size)/2f+size/2f;float dx=event.getX()-cx,dy=event.getY()-cy;if(Math.sqrt(dx*dx+dy*dy)>size/2f)return true;double angle=Math.toDegrees(Math.atan2(dy,dx))+90;if(angle<0)angle+=360;double accumulated=0;for(int i=0;i<values.size();i++){accumulated+=values.get(i)/total*360d;if(angle<=accumulated){selected=i;invalidate();if(listener!=null)listener.onSelected(i);break;}}return true;}
+    void setSelected(int i){selected=i;invalidate();if(listener!=null)listener.onSelected(i);}
+    int shade(int color,float factor){return Color.rgb(Math.min(255,(int)(Color.red(color)*factor)),Math.min(255,(int)(Color.green(color)*factor)),Math.min(255,(int)(Color.blue(color)*factor)));}
+    @Override protected void onDraw(Canvas canvas){
+      super.onDraw(canvas);float width=Math.min(getWidth()-dp(30),getHeight()*1.18f);float height=width*0.68f;float depth=dp(18);
+      if(width<=0||height<=0)return;float left=(getWidth()-width)/2f,top=(getHeight()-height-depth)/2f;
+      oval.set(left,top,left+width,top+height);
+      // Draw the pie's darker extruded side in layers to create a 3D thickness effect.
+      for(int layer=(int)depth;layer>=1;layer--){float offset=layer;float start=-90f;for(int i=0;i<values.size();i++){float sweep=(float)(values.get(i)/total*360d);paint.setColor(shade(colors.get(i),0.52f));paint.setStyle(android.graphics.Paint.Style.FILL);canvas.drawArc(oval,start,sweep,false,paint);canvas.drawArc(oval,start,sweep,true,paint);start+=sweep;}canvas.save();canvas.translate(0,offset);start=-90f;for(int i=0;i<values.size();i++){float sweep=(float)(values.get(i)/total*360d);paint.setColor(shade(colors.get(i),0.52f));canvas.drawArc(oval,start,sweep,true,paint);start+=sweep;}canvas.restore();}
+      float start=-90f;
+      for(int i=0;i<values.size();i++){float sweep=(float)(values.get(i)/total*360d);paint.setColor(colors.get(i));paint.setStyle(android.graphics.Paint.Style.FILL);if(i==selected){float mid=(float)Math.toRadians(start+sweep/2);canvas.save();canvas.translate((float)Math.cos(mid)*dp(7),(float)Math.sin(mid)*dp(5));canvas.drawArc(oval,start,sweep,true,paint);canvas.restore();}else canvas.drawArc(oval,start,sweep,true,paint);start+=sweep;}
+      if(selected>=0&&selected<values.size()){paint.setColor(textColor());paint.setTextAlign(android.graphics.Paint.Align.CENTER);paint.setTextSize(dp(14));canvas.drawText(String.format(Locale.US,"%.2f%%",values.get(selected)/total*100),getWidth()/2f,getHeight()-dp(2),paint);}
+    }
+    @Override public boolean onTouchEvent(android.view.MotionEvent event){
+      if(event.getAction()!=MotionEvent.ACTION_UP)return true;
+      float width=Math.min(getWidth()-dp(30),getHeight()*1.18f),height=width*0.68f,depth=dp(18);float left=(getWidth()-width)/2f,top=(getHeight()-height-depth)/2f;
+      float cx=getWidth()/2f,cy=top+height/2f;double dx=event.getX()-cx,dy=(event.getY()-cy)/0.68d;
+      if(Math.sqrt(dx*dx+dy*dy)>width/2f||event.getY()<top-depth||event.getY()>top+height+depth)return true;
+      double angle=Math.toDegrees(Math.atan2(dy,dx))+90;if(angle<0)angle+=360;double accumulated=0;
+      for(int i=0;i<values.size();i++){accumulated+=values.get(i)/total*360d;if(angle<=accumulated){setSelected(i);break;}}
+      return true;
+    }
   }
 
   String key(JSONObject a){return a.optString("type")+":"+a.optString("id");}
