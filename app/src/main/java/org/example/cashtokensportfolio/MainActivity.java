@@ -56,7 +56,64 @@ public class MainActivity extends Activity {
   int cardColor(){return themeMode==1?Color.rgb(18,18,18):themeMode==2?Color.rgb(7,151,108):Color.WHITE;}
   int textColor(){return themeMode==1?Color.WHITE:themeMode==2?Color.WHITE:Color.BLACK;}
   int buttonColor(){return themeMode==1?Color.rgb(45,45,45):themeMode==2?Color.rgb(0,105,76):Color.rgb(235,241,239);}
-  void openMenu(){String current=themeMode==0?"Day":themeMode==1?"Dark":"Bitcoin Cash Green";new AlertDialog.Builder(this).setTitle("Menu").setItems(new String[]{"Background: "+current,"Currency: "+displayCurrency,"About"},(dialog,which)->{if(which==0)chooseTheme();else if(which==1)chooseCurrency();else if(which==2)showAbout();}).show();}
+  void openMenu(){String current=themeMode==0?"Day":themeMode==1?"Dark":"Bitcoin Cash Green";new AlertDialog.Builder(this).setTitle("Menu").setItems(new String[]{"Background: "+current,"Currency: "+displayCurrency,"Donate","About"},(dialog,which)->{if(which==0)chooseTheme();else if(which==1)chooseCurrency();else if(which==2)showDonate();else if(which==3)showAbout();}).show();}
+
+  final String DONATION_BCH="zzdz6jxh5kjglqzr454x4pjmwwfw5p336umt9qnt7m";
+  final String DONATION_TOKEN="bitcoincash:zzdz6jxh5kjglqzr454x4pjmwwfw5p336umt9qnt7m";
+  void copyDonation(String address){
+    android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("CashTrack donation address",address));
+    Toast.makeText(this,"Address copied",Toast.LENGTH_SHORT).show();
+  }
+  android.graphics.Bitmap donationQr(String address){
+    try{
+      com.google.zxing.common.BitMatrix matrix=new com.google.zxing.qrcode.QRCodeWriter().encode(address,com.google.zxing.BarcodeFormat.QR_CODE,480,480);
+      android.graphics.Bitmap bitmap=android.graphics.Bitmap.createBitmap(480,480,android.graphics.Bitmap.Config.ARGB_8888);
+      for(int y=0;y<480;y++)for(int x=0;x<480;x++)bitmap.setPixel(x,y,matrix.get(x,y)?Color.BLACK:Color.WHITE);
+      return bitmap;
+    }catch(Exception e){return null;}
+  }
+  void addDonationEntry(LinearLayout layout,String heading,String address){
+    TextView label=new TextView(this);
+    label.setText(heading);
+    label.setTextSize(19);
+    label.setTypeface(null,1);
+    label.setGravity(Gravity.CENTER);
+    label.setPadding(0,dp(16),0,dp(8));
+    layout.addView(label);
+    ImageView qr=new ImageView(this);
+    android.graphics.Bitmap bitmap=donationQr(address);
+    if(bitmap!=null)qr.setImageBitmap(bitmap);
+    qr.setContentDescription("Copy "+heading+" address");
+    qr.setOnClickListener(v->copyDonation(address));
+    LinearLayout.LayoutParams qrParams=new LinearLayout.LayoutParams(dp(210),dp(210));
+    qrParams.gravity=Gravity.CENTER_HORIZONTAL;
+    layout.addView(qr,qrParams);
+    TextView addressText=new TextView(this);
+    addressText.setText(address);
+    addressText.setTextSize(14);
+    addressText.setGravity(Gravity.CENTER);
+    addressText.setTextIsSelectable(false);
+    addressText.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE);
+    addressText.setPadding(dp(4),dp(10),dp(4),dp(10));
+    addressText.setOnClickListener(v->copyDonation(address));
+    layout.addView(addressText);
+    TextView hint=new TextView(this);
+    hint.setText("Tap the QR code or address to copy");
+    hint.setTextSize(12);
+    hint.setGravity(Gravity.CENTER);
+    layout.addView(hint);
+  }
+  void showDonate(){
+    ScrollView scroll=new ScrollView(this);
+    LinearLayout layout=new LinearLayout(this);
+    layout.setOrientation(LinearLayout.VERTICAL);
+    layout.setPadding(dp(20),dp(8),dp(20),dp(20));
+    scroll.addView(layout);
+    addDonationEntry(layout,"Bitcoin Cash",DONATION_BCH);
+    addDonationEntry(layout,"CashTokens",DONATION_TOKEN);
+    new AlertDialog.Builder(this).setTitle("Donate to CashTrack").setView(scroll).setPositiveButton("Close",null).show();
+  }
   void showAbout(){
     String version="Unknown";
     try{
