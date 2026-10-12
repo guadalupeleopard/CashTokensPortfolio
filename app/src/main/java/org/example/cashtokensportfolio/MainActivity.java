@@ -60,8 +60,8 @@ public class MainActivity extends Activity {
   int textColor(){return themeMode==1?Color.WHITE:themeMode==2?Color.WHITE:Color.BLACK;}
   int buttonColor(){return themeMode==1?Color.rgb(45,45,45):themeMode==2?Color.rgb(0,105,76):Color.rgb(235,241,239);}
   void openMenu(){String current=themeMode==0?"Day":themeMode==1?"Dark":"Bitcoin Cash Green";new AlertDialog.Builder(this).setTitle("Menu").setItems(new String[]{"Background: "+current,"Currency: "+displayCurrency,"Asset Price History","Donate","About"},(dialog,which)->{if(which==0)chooseTheme();else if(which==1)chooseCurrency();else if(which==2)chooseAssetForHistory();else if(which==3)showDonate();else if(which==4)showAbout();}).show();}
-  void showHistoryPage(){assetHistoryOpen=false;chartPageOpen=false;ScrollView scroll=new ScrollView(this);LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setPadding(dp(18),dp(16),dp(18),dp(24));page.setBackgroundColor(pageColor());scroll.addView(page);LinearLayout header=new LinearLayout(this);header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);Button back=new Button(this);back.setText("← Back");back.setOnClickListener(v->build());header.addView(back);TextView title=label("Asset Price History",22);header.addView(title,new LinearLayout.LayoutParams(0,-2,1f));page.addView(header);page.addView(label("Select an asset to view its available historical prices.",14));for(int i=0;i<assets.length();i++){JSONObject a=assets.optJSONObject(i);if(a==null)continue;Button b=new Button(this);b.setText(a.optString("name","Asset")+" ("+a.optString("type","")+")");b.setAllCaps(false);page.addView(b,new LinearLayout.LayoutParams(-1,-2));b.setOnClickListener(v->showAssetHistory(a));}setContentView(scroll);applyThemeTo(page);}
-  void chooseAssetForHistory(){ArrayList<JSONObject> choices=new ArrayList<>();ArrayList<String> labels=new ArrayList<>();for(int i=0;i<assets.length();i++){JSONObject a=assets.optJSONObject(i);if(a!=null){choices.add(a);labels.add(a.optString("name","Asset")+" ("+a.optString("type","")+")");}}if(choices.isEmpty()){Toast.makeText(this,"Add an asset first.",Toast.LENGTH_SHORT).show();return;}new AlertDialog.Builder(this).setTitle("Choose asset price history").setItems(labels.toArray(new String[0]),(dialog,which)->{if(which>=0&&which<choices.size())showAssetHistory(choices.get(which));}).show();}
+  void showHistoryPage(){assetHistoryOpen=false;chartPageOpen=false;ScrollView scroll=new ScrollView(this);LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setPadding(dp(18),dp(16),dp(18),dp(24));page.setBackgroundColor(pageColor());scroll.addView(page);LinearLayout header=new LinearLayout(this);header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);Button back=new Button(this);back.setText("← Back");back.setOnClickListener(v->build());header.addView(back);TextView title=label("Asset Price History",22);header.addView(title,new LinearLayout.LayoutParams(0,-2,1f));page.addView(header);page.addView(label("Select a CashToken to view its available historical prices.",14));for(int i=0;i<assets.length();i++){JSONObject a=assets.optJSONObject(i);if(a==null||!"CashToken".equalsIgnoreCase(a.optString("type","")))continue;Button b=new Button(this);b.setText(a.optString("name","Asset")+" ("+a.optString("type","")+")");b.setAllCaps(false);page.addView(b,new LinearLayout.LayoutParams(-1,-2));b.setOnClickListener(v->showAssetHistory(a));}setContentView(scroll);applyThemeTo(page);}
+  void chooseAssetForHistory(){ArrayList<JSONObject> choices=new ArrayList<>();ArrayList<String> labels=new ArrayList<>();for(int i=0;i<assets.length();i++){JSONObject a=assets.optJSONObject(i);if(a!=null&&"CashToken".equalsIgnoreCase(a.optString("type",""))){choices.add(a);labels.add(a.optString("name","Asset")+" ("+a.optString("type","")+")");}}if(choices.isEmpty()){Toast.makeText(this,"Add a CashToken first.",Toast.LENGTH_SHORT).show();return;}new AlertDialog.Builder(this).setTitle("Choose asset price history").setItems(labels.toArray(new String[0]),(dialog,which)->{if(which>=0&&which<choices.size())showAssetHistory(choices.get(which));}).show();}
 
   final String DONATION_BCH="bitcoincash:qzdz6jxh5kjglqzr454x4pjmwwfw5p336uupk7adpg";
   final String DONATION_TOKEN="bitcoincash:zzdz6jxh5kjglqzr454x4pjmwwfw5p336umt9qnt7m";
@@ -290,14 +290,14 @@ public class MainActivity extends Activity {
     return null;
   }
   void showAssetHistory(JSONObject asset){
-    if(asset==null){Toast.makeText(this,"Could not identify this asset.",Toast.LENGTH_SHORT).show();return;}
+    if(asset==null||!"CashToken".equalsIgnoreCase(asset.optString("type",""))){Toast.makeText(this,"Price history is available only for CashTokens.",Toast.LENGTH_SHORT).show();return;}
     assetHistoryOpen=true;chartPageOpen=true;
     ScrollView scroll=new ScrollView(this);
     LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setPadding(dp(18),dp(12),dp(18),dp(24));page.setBackgroundColor(pageColor());scroll.addView(page);
     LinearLayout header=new LinearLayout(this);header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);
     Button back=new Button(this);back.setText("← Back");back.setOnClickListener(v->{assetHistoryOpen=false;build();});header.addView(back);
     TextView title=label(asset.optString("name","Asset")+" Price History",20);header.addView(title,new LinearLayout.LayoutParams(0,-2,1f));page.addView(header);
-    page.addView(label("BCH and Pi: Binance daily close prices in USDT. USDT: estimated USD peg from the USDC/USDT pair. CashTokens: CauldronSwap prices in BCH satoshis.",14));
+    page.addView(label("CashToken historical prices from CauldronSwap, quoted in BCH satoshis.",14));
     LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.HORIZONTAL);page.addView(controls);
     TextView statusText=label("Loading historical prices…",14);page.addView(statusText);
     FrameLayout graphHolder=new FrameLayout(this);page.addView(graphHolder,new LinearLayout.LayoutParams(-1,dp(300)));
@@ -319,31 +319,14 @@ public class MainActivity extends Activity {
             if(result instanceof JSONObject){JSONArray points=((JSONObject)result).optJSONArray("history");if(points!=null)for(int i=0;i<points.length();i++){JSONObject p=points.optJSONObject(i);if(p==null)continue;long time=p.optLong("time",0);double sats=p.optDouble("avg",Double.NaN);if(time>0&&Double.isFinite(sats)&&sats>=0){ts.add(time*1000L);ps.add(sats);}}}
             if(!ts.isEmpty())sourceLabel=" • live Cauldron API";
           }
-        }else{
-          String symbol="BCHUSDT";String type=asset.optString("type","").toUpperCase(Locale.US);
-          if(type.equals("PI"))symbol="PIUSDT";
-          else if(type.equals("USDT"))symbol="USDCUSDT";
-          // Use public Binance daily candles to avoid CoinGecko API-key authorization errors.
-          // Binance returns at most 1000 daily candles per request.
-          Object response=fetchAny("https://data-api.binance.vision/api/v3/klines?symbol="+symbol+"&interval=1d&limit=1000");
-          JSONArray points=response instanceof JSONArray?(JSONArray)response:null;
-          if(points!=null)for(int i=0;i<points.length();i++){
-            JSONArray p=points.optJSONArray(i);if(p==null||p.length()<5)continue;
-            long time=p.optLong(0,0);double close;
-            try{close=Double.parseDouble(p.optString(4,"NaN"));}catch(Exception ex){continue;}
-            if(time>0&&Double.isFinite(close)&&close>=0){
-              if(type.equals("USDT")&&close>0)close=1.0/close;
-              ts.add(time);ps.add(close);
-            }
-          }
         }
-      }catch(Exception e){failure="Could not load price history: "+e.getMessage()+". The selected provider may be unavailable or the asset pair may not exist.";}
+      }catch(Exception e){failure="Could not load price history: "+e.getMessage()+". CauldronSwap may be temporarily unavailable.";}
       final String err=failure;
       final String source=sourceLabel;
       runOnUiThread(()->{
         timestamps.addAll(ts);priceValues.addAll(ps);
         if(priceValues.isEmpty()){statusText.setText(err==null?"No historical price data is available for this asset.":err);return;}
-        statusText.setText("Loaded "+priceValues.size()+" historical points"+("CashToken".equalsIgnoreCase(asset.optString("type"))?" • BCH satoshis"+source:" • USD"));
+        statusText.setText("Loaded "+priceValues.size()+" historical points"+(" • BCH satoshis"+source));
         graph[0]=new HistoryGraph(this,timestamps,priceValues,interval[0]);graphHolder.addView(graph[0],new FrameLayout.LayoutParams(-1,-1));
         redraw[0]=()->{if(graph[0]!=null){graph[0].interval=interval[0];graph[0].invalidate();}};
         redraw[0].run();applyThemeTo(page);
