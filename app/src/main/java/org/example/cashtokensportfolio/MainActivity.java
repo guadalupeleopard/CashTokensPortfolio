@@ -34,9 +34,17 @@ public class MainActivity extends Activity {
     updateNavigationBarAppearance();
   }
   void updateNavigationBarAppearance(){
+    Window window=getWindow();
     int flags=View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
     if(themeMode==0)flags|=View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
-    getWindow().getDecorView().setSystemUiVisibility(flags);
+    View decor=window.getDecorView();
+    decor.setBackgroundColor(pageColor());
+    decor.setSystemUiVisibility(flags);
+    window.setNavigationBarColor(Color.TRANSPARENT);
+    if(Build.VERSION.SDK_INT>=29){
+      window.setNavigationBarContrastEnforced(false);
+      window.setNavigationBarDividerColor(Color.TRANSPARENT);
+    }
   }
   TextView label(String s,int size){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(Color.rgb(20,40,43));t.setPadding(dp(4),dp(10),dp(4),dp(10));return t;}
   void addButton(LinearLayout parent,String title,Runnable action){Button b=new Button(this);b.setText(title);parent.addView(b);b.setOnClickListener(v->action.run());}
