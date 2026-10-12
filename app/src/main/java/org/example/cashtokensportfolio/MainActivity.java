@@ -308,16 +308,30 @@ public class MainActivity extends Activity {
       ArrayList<Long> ts=new ArrayList<>();ArrayList<Double> ps=new ArrayList<>();String failure=null;String sourceLabel="";
       try{
         if("CashToken".equalsIgnoreCase(asset.optString("type"))){
-          String bundledFile=bundledHistoryFile(asset);
-          if(bundledFile!=null){
-            loadBundledCashTokenHistory(bundledFile,ts,ps,isCauldronStablecoin(asset)?100d:1d);
-            if(!ts.isEmpty())sourceLabel=" • bundled history";
-          }
-          if(ts.isEmpty()){
-            String token=asset.optString("id").toLowerCase(Locale.US);long now=System.currentTimeMillis()/1000L;
+          // Query CauldronSwap for every CashToken, including assets with bundled seed data.
+          // Bundled files are a fallback for offline/API failure or tokens without indexed trades.
+          String token=asset.optString("id").toLowerCase(Locale.US);
+          long now=System.currentTimeMillis()/1000L;
+          try{
             Object result=fetchAny("https://indexer.riften.net/cauldron/price/"+token+"/history?start=1&end="+now+"&stepsize=86400");
-            if(result instanceof JSONObject){JSONArray points=((JSONObject)result).optJSONArray("history");if(points!=null)for(int i=0;i<points.length();i++){JSONObject p=points.optJSONObject(i);if(p==null)continue;long time=p.optLong("time",0);double priceUnits=p.optDouble("avg",Double.NaN);if(time>0&&Double.isFinite(priceUnits)&&priceUnits>=0){ts.add(time*1000L);ps.add(priceUnits*(isCauldronStablecoin(asset)?100d:1d));}}}
-            if(!ts.isEmpty())sourceLabel=" • live Cauldron API";
+            if(result instanceof JSONObject){
+              JSONArray points=((JSONObject)result).optJSONArray("history");
+              if(points!=null)for(int i=0;i<points.length();i++){
+                JSONObject p=points.optJSONObject(i);if(p==null)continue;
+                long time=p.optLong("time",0);double priceUnits=p.optDouble("avg",Double.NaN);
+                if(time>0&&Double.isFinite(priceUnits)&&priceUnits>=0){
+                  ts.add(time*1000L);ps.add(priceUnits*(isCauldronStablecoin(asset)?100d:1d));
+                }
+              }
+            }
+            if(!ts.isEmpty())sourceLabel=" • live CauldronSwap API";
+          }catch(Exception ignored){}
+          if(ts.isEmpty()){
+            String bundledFile=bundledHistoryFile(asset);
+            if(bundledFile!=null){
+              loadBundledCashTokenHistory(bundledFile,ts,ps,isCauldronStablecoin(asset)?100d:1d);
+              if(!ts.isEmpty())sourceLabel=" • bundled fallback";
+            }
           }
         }
       }catch(Exception e){failure="Could not load price history: "+e.getMessage()+". CauldronSwap may be temporarily unavailable.";}
