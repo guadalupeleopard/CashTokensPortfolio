@@ -4,7 +4,7 @@
         android:label="CashTrack"
         android:icon="@drawable/cashtrack_icon"
         android:roundIcon="@drawable/cashtrack_icon"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar"
+        android:theme="@style/Theme.CashTrack"
         android:usesCleartextTraffic="false">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
