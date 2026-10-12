@@ -594,25 +594,30 @@ public class MainActivity extends Activity {
       notes.append("CoinGecko OK. ");
     }catch(Exception e){notes.append("CoinGecko unavailable. ");}
     int found=0,missing=0;
-    // TokenStork supplies cached market history for all CashTokens it tracks.
-    // Use its newest available venue price for the main portfolio page, then
-    // convert BCH satoshis to USD using the current BCH/USD rate.
+    // Use CauldronSwap's own AMM-derived price history, not TokenStork's
+    // cross-indexed quote. The newest recent observation is denominated in
+    // BCH satoshi-equivalent units and converted to USD with the BCH/USD rate.
+    // If Cauldron has no recent observation, leave the token unpriced rather
+    // than presenting a stale or unrelated quote as current.
+    long nowSeconds=System.currentTimeMillis()/1000L;
+    long startSeconds=nowSeconds-7L*24L*60L*60L;
     for(int i=0;i<assets.length();i++){
       JSONObject asset=assets.optJSONObject(i);
       if(asset==null||!"CashToken".equals(asset.optString("type")))continue;
       String category=asset.optString("id").toLowerCase(Locale.US);
       try{
-        String url="https://tokenstork.com/api/tokens/"+category+"/history";
+        String url="https://indexer.riften.net/cauldron/price/"+category+"/history?start="+startSeconds+"&end="+nowSeconds+"&stepsize=600";
         Object response=fetchAny(url);
-        Double sats=extractLatestHistorySats(response);
+        Double priceUnits=extractLatestCauldronHistoryPrice(response,nowSeconds-24L*60L*60L);
         Double bch=prices.get("BCH:bch");
-        if(sats!=null&&bch!=null){
+        if(priceUnits!=null&&bch!=null){
+          double sats=priceUnits*(isCauldronStablecoin(asset)?100d:1d);
           double usd=(sats/100000000d)*bch;
-          if(Double.isFinite(usd)&&usd>=0){prices.put(key(asset),usd);found++;}else missing++;
+          if(Double.isFinite(usd)&&usd>0){prices.put(key(asset),usd);found++;}else missing++;
         }else missing++;
       }catch(Exception e){missing++;}
     }
-    notes.append("CashTokens priced: ").append(found).append("; unavailable: ").append(missing);
+    notes.append("CashTokens priced from CauldronSwap: ").append(found).append("; unavailable: ").append(missing);
     final String message=notes.toString();runOnUiThread(()->{status.setText(message);render();});
   }).start();}
 
@@ -720,6 +725,22 @@ public class MainActivity extends Activity {
       if(bitmap!=null){cashTokenIconCache.put(category,bitmap);runOnUiThread(()->{if(!isFinishing())render();});}
     }).start();
     target.setTag(category);
+  }
+  Double extractLatestCauldronHistoryPrice(Object data,long minimumTimestamp){
+    if(!(data instanceof JSONObject))return null;
+    JSONArray points=((JSONObject)data).optJSONArray("history");
+    if(points==null)return null;
+    Double latestPrice=null;long latestTs=-1;
+    for(int i=0;i<points.length();i++){
+      JSONObject point=points.optJSONObject(i);
+      if(point==null||point.isNull("avg"))continue;
+      double price=point.optDouble("avg",Double.NaN);
+      long ts=point.optLong("time",-1);
+      if(ts>=minimumTimestamp&&ts<=System.currentTimeMillis()/1000L&&Double.isFinite(price)&&price>0&&ts>=latestTs){
+        latestPrice=price;latestTs=ts;
+      }
+    }
+    return latestPrice;
   }
   Double extractLatestHistorySats(Object data){
     if(!(data instanceof JSONObject))return null;
