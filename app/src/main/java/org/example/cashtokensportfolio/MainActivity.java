@@ -49,24 +49,41 @@ public class MainActivity extends Activity {
       putPrice("BCH:bch",j.optJSONObject("bitcoin-cash"));putPrice("PI:pi",j.optJSONObject("pi-network"));putPrice("USDT:usdt",j.optJSONObject("tether"));notes.append("CoinGecko OK. ");
     }catch(Exception e){notes.append("CoinGecko unavailable. ");}
     int found=0,missing=0;
-    // TokenStork documents GET /api/tokens; match by full category ID, never symbol alone.
-    // The directory may change its response fields or pagination. Unrecognized data stays unpriced.
+    // TokenStork's directory endpoint does not expose live venue prices.
+    // Its per-category history endpoint returns priceSats points for Cauldron/Fex.
+    // Match the exact category ID in the URL; convert BCH satoshis to USD using BCH/USD.
     for(int i=0;i<assets.length();i++){
       JSONObject asset=assets.optJSONObject(i);
       if(asset==null||!"CashToken".equals(asset.optString("type")))continue;
-      String category=asset.optString("id");
+      String category=asset.optString("id").toLowerCase(Locale.US);
       try{
-        String url="https://tokenstork.com/api/tokens?search="+URLEncoder.encode(category,"UTF-8")+"&limit=20";
-        Object response=fetchAny(url); JSONObject token=findToken(response,category);
-        if(token==null){missing++;continue;}
-        Double usd=extractUsd(token);
-        if(usd==null){Double sats=extractSats(token);Double bch=prices.get("BCH:bch");if(sats!=null&&bch!=null)usd=sats/100000000d*bch;}
-        if(usd!=null&&Double.isFinite(usd)&&usd>=0){prices.put(key(asset),usd);found++;}else missing++;
+        String url="https://tokenstork.com/api/tokens/"+category+"/history";
+        Object response=fetchAny(url);
+        Double sats=extractLatestHistorySats(response);
+        Double bch=prices.get("BCH:bch");
+        if(sats!=null&&bch!=null){
+          double usd=sats/100000000d*bch;
+          if(Double.isFinite(usd)&&usd>=0){prices.put(key(asset),usd);found++;}else missing++;
+        }else missing++;
       }catch(Exception e){missing++;}
     }
     notes.append("CashTokens priced: ").append(found).append("; unavailable: ").append(missing);
     final String message=notes.toString();runOnUiThread(()->{status.setText(message);render();});
   }).start();}
+  Double extractLatestHistorySats(Object data){
+    if(!(data instanceof JSONObject))return null;
+    JSONArray points=((JSONObject)data).optJSONArray("points");
+    if(points==null)return null;
+    Double latestPrice=null; long latestTs=-1;
+    for(int i=0;i<points.length();i++){
+      JSONObject point=points.optJSONObject(i);
+      if(point==null||point.isNull("priceSats"))continue;
+      double price=point.optDouble("priceSats",Double.NaN);
+      long ts=point.optLong("ts",-1);
+      if(Double.isFinite(price)&&price>=0&&ts>=latestTs){latestPrice=price;latestTs=ts;}
+    }
+    return latestPrice;
+  }
   JSONObject findToken(Object data,String id){
     if(data instanceof JSONArray){JSONArray arr=(JSONArray)data;for(int i=0;i<arr.length();i++){JSONObject t=findToken(arr.opt(i),id);if(t!=null)return t;}}
     if(data instanceof JSONObject){JSONObject o=(JSONObject)data;
