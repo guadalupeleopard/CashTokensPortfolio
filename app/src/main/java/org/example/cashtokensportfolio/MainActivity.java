@@ -337,7 +337,7 @@ public class MainActivity extends Activity {
   String bundledHistoryFile(JSONObject asset){
     String name=asset.optString("name","").toLowerCase(Locale.US).replaceAll("[^a-z0-9]","");
     if(name.equals("shibch")||name.equals("shibainu")||name.equals("shib")||name.equals("shibainucashtoken"))return "shibch_daily.json";
-    if(name.equals("furu"))return "furu_daily.json";
+    if(name.equals("furu")||name.equals("furutoken")||name.equals("furutokens"))return "furu_daily.json";
     if(name.equals("paryonusd")||name.equals("paryon")||name.equals("pusd"))return "paryonusd_daily.json";
     if(name.equals("moriausd")||name.equals("moria")||name.equals("musd"))return "moriausd_daily.json";
     return null;
