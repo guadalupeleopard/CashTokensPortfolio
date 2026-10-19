@@ -17,6 +17,11 @@ import java.net.*;
 import java.io.*;
 import java.math.*;
 import java.util.*;
+import androidx.work.Constraints;
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.NetworkType;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
 
 public class MainActivity extends Activity {
   LinearLayout root, items, performanceHolder; TextView total, status; int performanceDays=7; Button themeButton, chartButton; JSONArray assets = new JSONArray(); int selectedChartSlice=-1;
@@ -142,7 +147,12 @@ public class MainActivity extends Activity {
   void chooseTheme(){new AlertDialog.Builder(this).setTitle("Choose background").setItems(new String[]{"☀  Day","☾  Dark","₿  Bitcoin Cash Green"},(dialog,which)->{themeMode=which;getPreferences(0).edit().putInt("theme_mode",themeMode).apply();applyTheme();}).show();}
   void applyTheme(){updateNavigationBarAppearance();if(root==null)return;root.setBackgroundColor(pageColor());if(themeButton!=null){themeButton.setText("☰");themeButton.setContentDescription("Open menu");}applyThemeTo(root);}
   void applyThemeTo(View view){if(view instanceof TextView){((TextView)view).setTextColor(textColor());}if(view instanceof Button){view.setBackgroundTintList(android.content.res.ColorStateList.valueOf(buttonColor()));}if(view instanceof LinearLayout){LinearLayout ll=(LinearLayout)view;if(ll==root)ll.setBackgroundColor(pageColor());else if(ll==items){}else if(ll.getOrientation()==LinearLayout.VERTICAL&&ll.getChildCount()>0)ll.setBackgroundColor(cardColor());}if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++)applyThemeTo(group.getChildAt(i));}}
-  @Override public void onCreate(Bundle b){super.onCreate(b);themeMode=getPreferences(0).getInt("theme_mode",0);displayCurrency=getPreferences(0).getString("display_currency","USD");if(!Arrays.asList(currencyCodes).contains(displayCurrency))displayCurrency="USD";configureNavigationBar();try{assets=new JSONArray(getPreferences(0).getString(PREF,"[]"));}catch(Exception ignored){} build(); refresh();}
+  @Override public void onCreate(Bundle b){super.onCreate(b);themeMode=getPreferences(0).getInt("theme_mode",0);displayCurrency=getPreferences(0).getString("display_currency","USD");if(!Arrays.asList(currencyCodes).contains(displayCurrency))displayCurrency="USD";configureNavigationBar();try{assets=new JSONArray(getPreferences(0).getString(PREF,"[]"));}catch(Exception ignored){} scheduleDailyPortfolioSnapshot(); build(); refresh();}
+  void scheduleDailyPortfolioSnapshot(){
+    Constraints constraints=new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build();
+    PeriodicWorkRequest request=new PeriodicWorkRequest.Builder(DailyPortfolioWorker.class,24,java.util.concurrent.TimeUnit.HOURS).setConstraints(constraints).build();
+    WorkManager.getInstance(this).enqueueUniquePeriodicWork("cashtrack_daily_portfolio_snapshot",ExistingPeriodicWorkPolicy.KEEP,request);
+  }
   void save(){getPreferences(0).edit().putString(PREF,assets.toString()).apply();}
   @Override public void onBackPressed(){
     if(assetHistoryOpen){assetHistoryOpen=false;build();return;}
@@ -547,7 +557,7 @@ public class MainActivity extends Activity {
         if(Double.isFinite(usd)&&usd>=0){times.add(timestamp);values.add(usd);}
       }
     }catch(Exception ignored){}
-    if(values.isEmpty()){performanceHolder.addView(label("History starts after the first complete price refresh. Open CashTrack regularly to record daily values.",13));return;}
+    if(values.isEmpty()){performanceHolder.addView(label("History starts after the first complete price refresh. Daily background snapshots run when Android permits.",13));return;}
     performanceHolder.addView(new PortfolioLineGraph(this,times,values),new LinearLayout.LayoutParams(-1,dp(230)));
     performanceHolder.addView(label("Daily snapshots • Includes deposits and withdrawals • Missing days are not estimated",12));
   }
