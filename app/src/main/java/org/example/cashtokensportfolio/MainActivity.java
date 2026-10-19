@@ -19,7 +19,7 @@ import java.math.*;
 import java.util.*;
 
 public class MainActivity extends Activity {
-  LinearLayout root, items; TextView total, status; Button themeButton, chartButton; JSONArray assets = new JSONArray(); int selectedChartSlice=-1;
+  LinearLayout root, items, performanceHolder; TextView total, status; int performanceDays=7; Button themeButton, chartButton; JSONArray assets = new JSONArray(); int selectedChartSlice=-1;
   int themeMode=0; // 0=Day, 1=Dark, 2=Bitcoin Cash
   boolean chartPageOpen=false;
   boolean assetHistoryOpen=false;
@@ -167,7 +167,7 @@ public class MainActivity extends Activity {
     });
     root=new LinearLayout(this);root.setPadding(dp(18),dp(20),dp(18),dp(20));root.setOrientation(1);root.setBackgroundColor(Color.rgb(244,249,247));scroll.addView(root);setContentView(scroll);
     LinearLayout header=new LinearLayout(this);header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);ImageView appLogo=new ImageView(this);appLogo.setImageResource(R.drawable.cashtrack_icon);appLogo.setScaleType(ImageView.ScaleType.FIT_CENTER);LinearLayout.LayoutParams appLogoLp=new LinearLayout.LayoutParams(dp(48),dp(48));appLogoLp.rightMargin=dp(12);header.addView(appLogo,appLogoLp);TextView heading=label("CashTokens Portfolio",26);LinearLayout.LayoutParams headingLp=new LinearLayout.LayoutParams(0,-2,1f);header.addView(heading,headingLp);chartButton=new Button(this);chartButton.setText("◔");chartButton.setTextSize(24);chartButton.setGravity(Gravity.CENTER);chartButton.setMinWidth(0);chartButton.setMinimumWidth(0);chartButton.setPadding(0,0,0,0);chartButton.setLayoutParams(new LinearLayout.LayoutParams(dp(48),dp(48)));chartButton.setContentDescription("Open portfolio chart");header.addView(chartButton);chartButton.setOnClickListener(v->showChart());ImageButton historyButton=new ImageButton(this);historyButton.setImageResource(R.drawable.ic_trending_up);historyButton.setScaleType(ImageView.ScaleType.FIT_CENTER);historyButton.setPadding(dp(16.5f),dp(16.5f),dp(16.5f),dp(16.5f));historyButton.setBackgroundResource(android.R.drawable.btn_default);historyButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(buttonColor()));historyButton.setLayoutParams(new LinearLayout.LayoutParams(dp(48),dp(48)));historyButton.setContentDescription("Open asset price history");header.addView(historyButton);historyButton.setOnClickListener(v->showHistoryPage());themeButton=new Button(this);themeButton.setText("☰");themeButton.setTextSize(24);themeButton.setGravity(Gravity.CENTER);themeButton.setMinWidth(0);themeButton.setMinimumWidth(0);themeButton.setPadding(0,0,0,0);themeButton.setLayoutParams(new LinearLayout.LayoutParams(dp(48),dp(48)));themeButton.setContentDescription("Open menu");header.addView(themeButton);themeButton.setOnClickListener(v->openMenu());root.addView(header);root.addView(label("Watch-only • Stored on this device",13));total=label("Total: —",23);root.addView(total);status=label("Prices not loaded",12);root.addView(status);
-    addButton(root,"+ Add asset",this::addAssetDialog);addButton(root,"Refresh market prices",this::refresh);items=new LinearLayout(this);items.setOrientation(1);root.addView(items);render();}
+    addButton(root,"+ Add asset",this::addAssetDialog);addButton(root,"Refresh market prices",this::refresh);items=new LinearLayout(this);items.setOrientation(1);root.addView(items);performanceHolder=new LinearLayout(this);performanceHolder.setOrientation(1);root.addView(performanceHolder);render();}
 
   int chartAssetPreferredColor(JSONObject a){
     String type=a.optString("type","").toUpperCase(Locale.US);
@@ -506,7 +506,85 @@ public class MainActivity extends Activity {
       addButton(row,"Edit / Remove",()->editDialog(index));
     }
     total.setText("Known value: "+formatValue(sum)+" "+displayCurrency);if(incomplete)total.append("\n(Excludes unpriced assets)");
+    if(!incomplete&&!assets.toString().equals("[]")&&Double.isFinite(sum)&&sum>=0)recordPortfolioSnapshot(sum);
+    renderPerformance();
     applyTheme();
+  }
+
+  // Persist one complete USD valuation per local calendar day. Currency changes never rewrite history.
+  void recordPortfolioSnapshot(double usd){
+    String day=new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.US).format(new Date());
+    try{
+      JSONObject history=new JSONObject(getPreferences(0).getString("portfolio_daily_usd","{}"));
+      history.put(day,usd);
+      getPreferences(0).edit().putString("portfolio_daily_usd",history.toString()).apply();
+    }catch(Exception ignored){}
+  }
+  void renderPerformance(){
+    if(performanceHolder==null)return;
+    performanceHolder.removeAllViews();
+    performanceHolder.addView(label("Portfolio Performance",21));
+    LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.HORIZONTAL);
+    for(final int days:new int[]{1,7,30,90,365,0}){
+      Button b=new Button(this);b.setText(days==0?"ALL":days==1?"1D":days==7?"7D":days==30?"30D":days==90?"90D":"1Y");
+      b.setAllCaps(false);b.setTextSize(11);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(dp(2),0,dp(2),0);
+      controls.addView(b,new LinearLayout.LayoutParams(0,dp(44),1));
+      b.setOnClickListener(v->{performanceDays=days;renderPerformance();});
+      b.setAlpha(performanceDays==days?1f:0.65f);
+    }
+    performanceHolder.addView(controls);
+    ArrayList<Long> times=new ArrayList<>();ArrayList<Double> values=new ArrayList<>();
+    try{
+      JSONObject history=new JSONObject(getPreferences(0).getString("portfolio_daily_usd","{}"));
+      ArrayList<String> dates=new ArrayList<>();Iterator<String> keys=history.keys();while(keys.hasNext())dates.add(keys.next());
+      Collections.sort(dates);
+      java.text.SimpleDateFormat parser=new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.US);parser.setLenient(false);
+      long cutoff=System.currentTimeMillis()-(long)performanceDays*86400000L;
+      for(String day:dates){
+        long timestamp=parser.parse(day).getTime();
+        if(performanceDays!=0&&timestamp+86400000L<cutoff)continue;
+        double usd=history.optDouble(day,Double.NaN);
+        if(Double.isFinite(usd)&&usd>=0){times.add(timestamp);values.add(usd);}
+      }
+    }catch(Exception ignored){}
+    if(values.isEmpty()){performanceHolder.addView(label("History starts after the first complete price refresh. Open CashTrack regularly to record daily values.",13));return;}
+    performanceHolder.addView(new PortfolioLineGraph(this,times,values),new LinearLayout.LayoutParams(-1,dp(230)));
+    performanceHolder.addView(label("Daily snapshots • Includes deposits and withdrawals • Missing days are not estimated",12));
+  }
+  class PortfolioLineGraph extends View{
+    final ArrayList<Long> dates;final ArrayList<Double> usd;
+    final android.graphics.Paint p=new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+    PortfolioLineGraph(Context c,ArrayList<Long> t,ArrayList<Double> v){super(c);dates=t;usd=v;setContentDescription("Portfolio value over time");}
+    @Override protected void onDraw(Canvas canvas){
+      super.onDraw(canvas);if(usd.isEmpty())return;
+      float left=dp(12),right=getWidth()-dp(82),top=dp(15),bottom=getHeight()-dp(34);
+      if(right<=left||bottom<=top)return;
+      double rate=displayCurrency.equals("BCH")?(currencyRate>0?1/currencyRate:0):currencyRate;
+      if(rate<=0)return;
+      double min=Collections.min(usd)*rate,max=Collections.max(usd)*rate;
+      if(max<=min){double pad=Math.max(0.00000001,Math.abs(max)*0.05);min=Math.max(0,min-pad);max+=pad;}
+      p.setColor(textColor());p.setTextSize(dp(10));p.setStyle(android.graphics.Paint.Style.FILL);
+      String fmt=displayCurrency.equals("BCH")?"%.6f":"%.2f";
+      canvas.drawText(String.format(Locale.US,fmt,max),right+dp(5),top+dp(5),p);
+      canvas.drawText(String.format(Locale.US,fmt,min),right+dp(5),bottom,p);
+      java.text.SimpleDateFormat df=new java.text.SimpleDateFormat("MMM d",Locale.US);
+      canvas.drawText(df.format(new Date(dates.get(0))),left,bottom+dp(19),p);
+      String last=df.format(new Date(dates.get(dates.size()-1)));
+      canvas.drawText(last,Math.max(left,right-p.measureText(last)),bottom+dp(19),p);
+      p.setStyle(android.graphics.Paint.Style.STROKE);p.setStrokeWidth(dp(1));
+      canvas.drawLine(left,bottom,right,bottom,p);
+      android.graphics.Path line=new android.graphics.Path();
+      long first=dates.get(0),lastTime=dates.get(dates.size()-1);
+      for(int i=0;i<usd.size();i++){
+        float x=first==lastTime?(left+right)/2:left+(right-left)*(float)(dates.get(i)-first)/(lastTime-first);
+        float y=(float)(bottom-(usd.get(i)*rate-min)/(max-min)*(bottom-top));
+        if(i==0)line.moveTo(x,y);else line.lineTo(x,y);
+      }
+      p.setColor(usd.get(usd.size()-1)>=usd.get(0)?Color.rgb(10,175,115):Color.rgb(220,65,65));
+      p.setStrokeWidth(dp(2.5f));canvas.drawPath(line,p);
+      p.setStyle(android.graphics.Paint.Style.FILL);
+      if(usd.size()==1)canvas.drawCircle((left+right)/2,(top+bottom)/2,dp(4),p);
+    }
   }
   EditText input(String hint,String value){EditText e=new EditText(this);e.setSingleLine(true);e.setHint(hint);e.setText(value);return e;}
   void addAssetDialog(){String[] types={"BCH","PI","USDT","CashToken"};new AlertDialog.Builder(this).setTitle("Choose asset").setItems(types,(d,which)->assetForm(-1,types[which])).show();}
