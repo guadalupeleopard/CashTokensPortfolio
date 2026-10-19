@@ -23,7 +23,7 @@ android {
         // GitHub Actions run numbers increase with each workflow run, allowing
         // newer APKs to install over older ones. Local builds default to 2.
         versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 2
-        versionName = "1.0.3"
+        versionName = "1.0.4"
     }
 
     buildTypes {
@@ -38,6 +38,7 @@ android {
 }
 
 dependencies {
+    implementation("androidx.work:work-runtime:2.10.0")
     implementation("com.caverock:androidsvg-aar:1.4")
     implementation("com.google.zxing:core:3.5.3")
 }
