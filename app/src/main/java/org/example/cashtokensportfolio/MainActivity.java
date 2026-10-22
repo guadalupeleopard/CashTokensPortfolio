@@ -535,8 +535,8 @@ public class MainActivity extends Activity {
     performanceHolder.removeAllViews();
     performanceHolder.addView(label("Portfolio Performance",21));
     LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.HORIZONTAL);
-    for(final int days:new int[]{1,7,30,90,365,0}){
-      Button b=new Button(this);b.setText(days==0?"ALL":days==1?"1D":days==7?"7D":days==30?"30D":days==90?"90D":"1Y");
+    for(final int days:new int[]{7,30,90,365,0}){
+      Button b=new Button(this);b.setText(days==0?"ALL":days==7?"7D":days==30?"30D":days==90?"90D":"1Y");
       b.setAllCaps(false);b.setTextSize(11);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(dp(2),0,dp(2),0);
       controls.addView(b,new LinearLayout.LayoutParams(0,dp(44),1));
       b.setOnClickListener(v->{performanceDays=days;renderPerformance();});
