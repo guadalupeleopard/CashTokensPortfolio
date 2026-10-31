@@ -951,29 +951,37 @@ public class MainActivity extends Activity {
     String summary=String.valueOf(value);
     return summary.length()>180?summary.substring(0,180)+"…":summary;
   }
+  // Prefer IPv4 when both address families are available, but retain IPv6
+  // addresses so requests still work on IPv6-only networks. OkHttp tries
+  // alternate resolved addresses when a connection attempt fails.
+  private static final okhttp3.OkHttpClient NETWORK_CLIENT =
+      new okhttp3.OkHttpClient.Builder()
+          .dns(hostname -> {
+            List<InetAddress> addresses = new ArrayList<>(okhttp3.Dns.SYSTEM.lookup(hostname));
+            addresses.sort((left, right) -> Integer.compare(left.getAddress().length, right.getAddress().length));
+            return addresses;
+          })
+          .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+          .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+          .followRedirects(true)
+          .build();
+
   Object fetchAny(String url)throws Exception{
-    HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection();
-    c.setConnectTimeout(10000);c.setReadTimeout(10000);c.setInstanceFollowRedirects(true);
-    c.setRequestProperty("Accept","application/json");c.setRequestProperty("User-Agent","CashTrack/1.0.4");
-    try{
-      int code=c.getResponseCode();
-      String body=readHttpBody(c,code);
-      if(code!=200)throw new IOException("HTTP "+code+(body.isEmpty()?"":"; body: "+body.substring(0,Math.min(180,body.length()))));
+    okhttp3.Request request=new okhttp3.Request.Builder().url(url)
+        .header("Accept","application/json")
+        .header("User-Agent","CashTrack/1.0.5")
+        .build();
+    try(okhttp3.Response response=NETWORK_CLIENT.newCall(request).execute()){
+      String body=response.body()!=null?response.body().string():"";
+      if(!response.isSuccessful())throw new IOException("HTTP "+response.code()+(body.isEmpty()?"":"; body: "+body.substring(0,Math.min(180,body.length()))));
       try{return new JSONTokener(body).nextValue();}
       catch(JSONException e){throw new IOException("invalid JSON response: "+body.substring(0,Math.min(180,body.length())),e);}
-    }finally{c.disconnect();}
+    }
   }
   void putPrice(String key,JSONObject data){if(data!=null&&data.has("usd"))prices.put(key,data.optDouble("usd"));}
   JSONObject fetch(String url)throws Exception{
-    HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection();
-    c.setConnectTimeout(10000);c.setReadTimeout(10000);c.setInstanceFollowRedirects(true);
-    c.setRequestProperty("Accept","application/json");c.setRequestProperty("User-Agent","CashTrack/1.0.4");
-    try{
-      int code=c.getResponseCode();
-      String body=readHttpBody(c,code);
-      if(code!=200)throw new IOException("HTTP "+code+(body.isEmpty()?"":"; body: "+body.substring(0,Math.min(180,body.length()))));
-      try{return new JSONObject(body);}
-      catch(JSONException e){throw new IOException("invalid JSON response: "+body.substring(0,Math.min(180,body.length())),e);}
-    }finally{c.disconnect();}
+    Object value=fetchAny(url);
+    if(!(value instanceof JSONObject))throw new IOException("Expected JSON object");
+    return (JSONObject)value;
   }
 }
