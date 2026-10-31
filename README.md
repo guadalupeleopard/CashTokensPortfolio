@@ -22,10 +22,10 @@ The workflow uses Java 17, Android SDK 35, and Gradle 8.9, then runs `assembleDe
 ## Market data
 
 - CoinGecko public simple/price endpoint for BCH, PI, and USDT.
-- TokenStork public directory endpoint for CashTokens, searched by full 64-character category ID.
+- CauldronSwap (Riften Labs indexer) current-price endpoint for CashTokens, queried by full 64-character category ID. Token decimals are retrieved from the indexer's BCMR token metadata endpoint.
 - Price availability and accuracy depend on third-party services.
 
-**Important:** TokenStork response field mapping and live CashToken prices have not been verified against a successful API response. Some or all CashTokens may show “Price unavailable.” API availability, throttling, and terms can change.
+**Important:** CashToken prices depend on successful responses from the CauldronSwap current-price and BCMR metadata endpoints, as well as the BCH/USD conversion rate. Some or all CashTokens may show “Price unavailable” when those services are unavailable or return incomplete data. API availability, throttling, and terms can change.
 
 ## Privacy
 
