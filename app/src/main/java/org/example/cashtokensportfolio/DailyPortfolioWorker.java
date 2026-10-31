@@ -77,6 +77,7 @@ public class DailyPortfolioWorker extends Worker {
             prefs.edit().putString("portfolio_daily_usd", history.toString()).apply();
             return Result.success();
         } catch (Exception e) {
+            android.util.Log.e("CashTrackWorker", "Daily portfolio snapshot failed: " + describeFailure(e), e);
             return Result.retry();
         }
     }
@@ -126,30 +127,58 @@ public class DailyPortfolioWorker extends Worker {
                     .followRedirects(true)
                     .build();
 
+    private String describeFailure(Throwable error) {
+        if (error == null) return "unknown error";
+        StringBuilder out = new StringBuilder(error.getClass().getSimpleName());
+        if (error.getMessage() != null && !error.getMessage().trim().isEmpty()) out.append(": ").append(error.getMessage().trim());
+        Throwable cause = error.getCause();
+        if (cause != null && cause != error) {
+            out.append(" | caused by ").append(cause.getClass().getSimpleName());
+            if (cause.getMessage() != null && !cause.getMessage().trim().isEmpty()) out.append(": ").append(cause.getMessage().trim());
+        }
+        for (Throwable suppressed : error.getSuppressed()) {
+            out.append(" | suppressed ").append(suppressed.getClass().getSimpleName());
+            if (suppressed.getMessage() != null && !suppressed.getMessage().trim().isEmpty()) out.append(": ").append(suppressed.getMessage().trim());
+        }
+        String result = out.toString();
+        return result.length() > 700 ? result.substring(0, 700) + "…" : result;
+    }
+
     private Object fetchAny(String url) throws Exception {
         okhttp3.Request request = new okhttp3.Request.Builder()
                 .url(url)
                 .header("Accept", "application/json")
-                .header("User-Agent", "CashTrack/1.0.6")
+                .header("User-Agent", "CashTrack/1.0.7")
                 .build();
         okhttp3.Response response;
+        String connectionPath = "dual-stack";
         try {
             response = NETWORK_CLIENT.newCall(request).execute();
         } catch (IOException primaryFailure) {
+            connectionPath = "IPv4-only retry";
             try {
                 response = IPV4_CLIENT.newCall(request).execute();
             } catch (IOException ipv4Failure) {
-                ipv4Failure.addSuppressed(primaryFailure);
-                throw ipv4Failure;
+                throw new IOException("Network attempts failed; dual-stack: " + describeFailure(primaryFailure)
+                        + "; IPv4-only retry: " + describeFailure(ipv4Failure), ipv4Failure);
             }
         }
         try (okhttp3.Response closeableResponse = response) {
             String body = closeableResponse.body() != null ? closeableResponse.body().string() : "";
+            String contentType = closeableResponse.header("Content-Type", "not provided");
+            String finalUrl = closeableResponse.request().url().toString();
             if (!closeableResponse.isSuccessful()) {
-                throw new IOException("HTTP " + closeableResponse.code()
-                        + (body.isEmpty() ? "" : "; body: " + body.substring(0, Math.min(180, body.length()))));
+                throw new IOException("HTTP " + closeableResponse.code() + " via " + connectionPath
+                        + "; URL=" + finalUrl + "; Content-Type=" + contentType
+                        + (body.isEmpty() ? "" : "; body: " + body.substring(0, Math.min(220, body.length()))));
             }
-            return new JSONTokener(body).nextValue();
+            try {
+                return new JSONTokener(body).nextValue();
+            } catch (org.json.JSONException e) {
+                throw new IOException("Invalid JSON via " + connectionPath + "; HTTP " + closeableResponse.code()
+                        + "; URL=" + finalUrl + "; Content-Type=" + contentType + "; body: "
+                        + body.substring(0, Math.min(220, body.length())), e);
+            }
         }
     }
 

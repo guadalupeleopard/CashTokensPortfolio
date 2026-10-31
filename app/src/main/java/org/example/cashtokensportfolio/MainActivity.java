@@ -941,10 +941,23 @@ public class MainActivity extends Activity {
     try(InputStream in=stream){byte[] buf=new byte[2048];int n;while((n=in.read(buf))!=-1)b.write(buf,0,n);}
     return b.toString("UTF-8");
   }
-  String diagnosticMessage(Exception e){
+  String diagnosticMessage(Throwable e){
+    if(e==null)return "unknown error";
+    StringBuilder out=new StringBuilder(e.getClass().getSimpleName());
     String message=e.getMessage();
-    if(message==null||message.trim().isEmpty())message=e.getClass().getSimpleName();
-    return message.length()>220?message.substring(0,220)+"…":message;
+    if(message!=null&&!message.trim().isEmpty())out.append(": ").append(message.trim());
+    Throwable cause=e.getCause();
+    if(cause!=null&&cause!=e){
+      out.append(" | caused by ").append(cause.getClass().getSimpleName());
+      if(cause.getMessage()!=null&&!cause.getMessage().trim().isEmpty())out.append(": ").append(cause.getMessage().trim());
+    }
+    Throwable[] suppressed=e.getSuppressed();
+    for(Throwable item:suppressed){
+      out.append(" | suppressed ").append(item.getClass().getSimpleName());
+      if(item.getMessage()!=null&&!item.getMessage().trim().isEmpty())out.append(": ").append(item.getMessage().trim());
+    }
+    String text=out.toString();
+    return text.length()>420?text.substring(0,420)+"…":text;
   }
   String summarizeJson(Object value){
     if(value==null||value==JSONObject.NULL)return "null";
@@ -984,24 +997,32 @@ public class MainActivity extends Activity {
   Object fetchAny(String url)throws Exception{
     okhttp3.Request request=new okhttp3.Request.Builder().url(url)
         .header("Accept","application/json")
-        .header("User-Agent","CashTrack/1.0.6")
+        .header("User-Agent","CashTrack/1.0.7")
         .build();
     okhttp3.Response response;
+    String connectionPath="dual-stack";
     try {
       response = NETWORK_CLIENT.newCall(request).execute();
     } catch (IOException primaryFailure) {
+      connectionPath="IPv4-only retry";
       try {
         response = IPV4_CLIENT.newCall(request).execute();
       } catch (IOException ipv4Failure) {
-        ipv4Failure.addSuppressed(primaryFailure);
-        throw ipv4Failure;
+        throw new IOException("Network attempts failed; dual-stack: "+diagnosticMessage(primaryFailure)
+            +"; IPv4-only retry: "+diagnosticMessage(ipv4Failure), ipv4Failure);
       }
     }
     try(okhttp3.Response closeableResponse=response){
       String body=closeableResponse.body()!=null?closeableResponse.body().string():"";
-      if(!closeableResponse.isSuccessful())throw new IOException("HTTP "+closeableResponse.code()+(body.isEmpty()?"":"; body: "+body.substring(0,Math.min(180,body.length()))));
+      String contentType=closeableResponse.header("Content-Type","not provided");
+      String finalUrl=closeableResponse.request().url().toString();
+      if(!closeableResponse.isSuccessful())throw new IOException("HTTP "+closeableResponse.code()
+          +" via "+connectionPath+"; URL="+finalUrl+"; Content-Type="+contentType
+          +(body.isEmpty()?"":"; body: "+body.substring(0,Math.min(220,body.length()))));
       try{return new JSONTokener(body).nextValue();}
-      catch(JSONException e){throw new IOException("invalid JSON response: "+body.substring(0,Math.min(180,body.length())),e);}
+      catch(JSONException e){throw new IOException("Invalid JSON via "+connectionPath+"; HTTP "+closeableResponse.code()
+          +"; URL="+finalUrl+"; Content-Type="+contentType+"; body: "
+          +body.substring(0,Math.min(220,body.length())),e);}
     }
   }
   void putPrice(String key,JSONObject data){if(data!=null&&data.has("usd"))prices.put(key,data.optDouble("usd"));}
