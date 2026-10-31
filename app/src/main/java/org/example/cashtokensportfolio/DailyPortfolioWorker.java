@@ -94,23 +94,35 @@ public class DailyPortfolioWorker extends Worker {
         return (JSONObject) value;
     }
 
+    // Match the foreground app: try IPv4 addresses first when available,
+    // while retaining IPv6 addresses for IPv6-only networks and fallback.
+    private static final okhttp3.OkHttpClient NETWORK_CLIENT =
+            new okhttp3.OkHttpClient.Builder()
+                    .dns(hostname -> {
+                        java.util.List<java.net.InetAddress> addresses =
+                                new java.util.ArrayList<>(okhttp3.Dns.SYSTEM.lookup(hostname));
+                        addresses.sort((left, right) ->
+                                Integer.compare(left.getAddress().length, right.getAddress().length));
+                        return addresses;
+                    })
+                    .connectTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
+                    .followRedirects(true)
+                    .build();
+
     private Object fetchAny(String url) throws Exception {
-        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-        connection.setConnectTimeout(12000);
-        connection.setReadTimeout(12000);
-        connection.setRequestProperty("Accept", "application/json");
-        connection.setRequestProperty("User-Agent", "CashTrack/1.0.4");
-        try {
-            if (connection.getResponseCode() != 200) throw new IOException("HTTP " + connection.getResponseCode());
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            try (InputStream in = connection.getInputStream()) {
-                byte[] buffer = new byte[4096];
-                int count;
-                while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+        okhttp3.Request request = new okhttp3.Request.Builder()
+                .url(url)
+                .header("Accept", "application/json")
+                .header("User-Agent", "CashTrack/1.0.5")
+                .build();
+        try (okhttp3.Response response = NETWORK_CLIENT.newCall(request).execute()) {
+            String body = response.body() != null ? response.body().string() : "";
+            if (!response.isSuccessful()) {
+                throw new IOException("HTTP " + response.code()
+                        + (body.isEmpty() ? "" : "; body: " + body.substring(0, Math.min(180, body.length()))));
             }
-            return new JSONTokener(out.toString("UTF-8")).nextValue();
-        } finally {
-            connection.disconnect();
+            return new JSONTokener(body).nextValue();
         }
     }
 
