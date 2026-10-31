@@ -140,16 +140,7 @@ public class DailyPortfolioWorker extends Worker {
         return result.length() > 700 ? result.substring(0, 700) + "…" : result;
     }
 
-    // Last-resort unencrypted HTTP is restricted to the CauldronSwap indexer host.
-    // TLS validation remains enabled for every HTTPS request.
-    private static final okhttp3.OkHttpClient HTTP_FALLBACK_CLIENT =
-            new okhttp3.OkHttpClient.Builder()
-                    .connectTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
-                    .readTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
-                    .followRedirects(false)
-                    .build();
-
-    private Object fetchAny(String url) throws Exception {
+        private Object fetchAny(String url) throws Exception {
         okhttp3.Request request = new okhttp3.Request.Builder()
                 .url(url)
                 .header("Accept", "application/json")
@@ -164,27 +155,11 @@ public class DailyPortfolioWorker extends Worker {
             try {
                 response = NETWORK_CLIENT.newCall(request).execute();
             } catch (IOException dualStackFailure) {
-                if ("indexer.riften.net".equalsIgnoreCase(new java.net.URL(url).getHost())) {
-                    String httpUrl = url.replaceFirst("^https://", "http://");
-                    try {
-                        okhttp3.Request httpRequest = new okhttp3.Request.Builder()
-                                .url(httpUrl)
-                                .header("Accept", "application/json")
-                                .header("User-Agent", "CashTrack/1.0.10")
-                                .build();
-                        connectionPath = "HTTP fallback (unencrypted)";
-                        response = HTTP_FALLBACK_CLIENT.newCall(httpRequest).execute();
-                    } catch (IOException httpFailure) {
-                        throw new IOException("Network attempts failed; IPv4-first: " + briefException(ipv4Failure)
-                                + "; dual-stack fallback: " + briefException(dualStackFailure)
-                                + "; HTTP fallback: " + briefException(httpFailure), httpFailure);
-                    }
-                } else {
-                    throw new IOException("Network attempts failed; IPv4-first: " + briefException(ipv4Failure)
+                    throw new IOException("HTTPS network attempts failed; IPv4-first: " + briefException(ipv4Failure)
                             + "; dual-stack fallback: " + briefException(dualStackFailure), dualStackFailure);
                 }
             }
-        }
+
         try (okhttp3.Response closeableResponse = response) {
             String body = closeableResponse.body() != null ? closeableResponse.body().string() : "";
             String contentType = closeableResponse.header("Content-Type", "not provided");
