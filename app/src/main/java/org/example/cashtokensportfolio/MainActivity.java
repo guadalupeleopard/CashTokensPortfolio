@@ -167,7 +167,10 @@ public class MainActivity extends Activity {
     Toast.makeText(this,"Press Back again to close CashTrack.",Toast.LENGTH_SHORT).show();
   }
 
-  void build(){chartPageOpen=false;assetHistoryOpen=false;ScrollView scroll=new ScrollView(this);
+  void build(){
+    chartPageOpen=false;assetHistoryOpen=false;
+    ScrollView scroll=new ScrollView(this);
+    scroll.setFillViewport(true);
     scroll.setOnApplyWindowInsetsListener((view,insets)->{
       int bottom;
       if(Build.VERSION.SDK_INT>=30)bottom=insets.getInsets(WindowInsets.Type.navigationBars()).bottom;
@@ -175,9 +178,137 @@ public class MainActivity extends Activity {
       view.setPadding(0,0,0,bottom);
       return insets;
     });
-    root=new LinearLayout(this);root.setPadding(dp(18),dp(20),dp(18),dp(20));root.setOrientation(1);root.setBackgroundColor(Color.rgb(244,249,247));scroll.addView(root);setContentView(scroll);
-    LinearLayout header=new LinearLayout(this);header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);ImageView appLogo=new ImageView(this);appLogo.setImageResource(R.drawable.cashtrack_icon);appLogo.setScaleType(ImageView.ScaleType.FIT_CENTER);LinearLayout.LayoutParams appLogoLp=new LinearLayout.LayoutParams(dp(48),dp(48));appLogoLp.rightMargin=dp(12);header.addView(appLogo,appLogoLp);TextView heading=label("CashTokens Portfolio",26);LinearLayout.LayoutParams headingLp=new LinearLayout.LayoutParams(0,-2,1f);header.addView(heading,headingLp);chartButton=new Button(this);chartButton.setText("◔");chartButton.setTextSize(24);chartButton.setGravity(Gravity.CENTER);chartButton.setMinWidth(0);chartButton.setMinimumWidth(0);chartButton.setPadding(0,0,0,0);chartButton.setLayoutParams(new LinearLayout.LayoutParams(dp(48),dp(48)));chartButton.setContentDescription("Open portfolio chart");header.addView(chartButton);chartButton.setOnClickListener(v->showChart());ImageButton historyButton=new ImageButton(this);historyButton.setImageResource(R.drawable.ic_trending_up);historyButton.setScaleType(ImageView.ScaleType.FIT_CENTER);historyButton.setPadding(dp(16.5f),dp(16.5f),dp(16.5f),dp(16.5f));historyButton.setBackgroundResource(android.R.drawable.btn_default);historyButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(buttonColor()));historyButton.setLayoutParams(new LinearLayout.LayoutParams(dp(48),dp(48)));historyButton.setContentDescription("Open asset price history");header.addView(historyButton);historyButton.setOnClickListener(v->showHistoryPage());themeButton=new Button(this);themeButton.setText("☰");themeButton.setTextSize(24);themeButton.setGravity(Gravity.CENTER);themeButton.setMinWidth(0);themeButton.setMinimumWidth(0);themeButton.setPadding(0,0,0,0);themeButton.setLayoutParams(new LinearLayout.LayoutParams(dp(48),dp(48)));themeButton.setContentDescription("Open menu");header.addView(themeButton);themeButton.setOnClickListener(v->openMenu());root.addView(header);root.addView(label("Watch-only • Stored on this device",13));total=label("Total: —",23);root.addView(total);status=label("Prices not loaded",12);root.addView(status);copyErrorButton=new Button(this);copyErrorButton.setText("Copy Error Message");copyErrorButton.setAllCaps(false);copyErrorButton.setVisibility(View.GONE);root.addView(copyErrorButton);copyErrorButton.setOnClickListener(v->{android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);clipboard.setPrimaryClip(android.content.ClipData.newPlainText("CashTrack diagnostic message",status.getText()));Toast.makeText(this,"Full diagnostic message copied",Toast.LENGTH_SHORT).show();});
-    addButton(root,"+ Add asset",this::addAssetDialog);addButton(root,"Refresh market prices",this::refresh);items=new LinearLayout(this);items.setOrientation(1);root.addView(items);performanceHolder=new LinearLayout(this);performanceHolder.setOrientation(1);root.addView(performanceHolder);render();}
+    root=new LinearLayout(this);
+    root.setPadding(dp(16),dp(14),dp(16),dp(24));
+    root.setOrientation(LinearLayout.VERTICAL);
+    root.setBackgroundColor(pageColor());
+    scroll.addView(root);
+    setContentView(scroll);
+
+    LinearLayout header=new LinearLayout(this);
+    header.setOrientation(LinearLayout.HORIZONTAL);
+    header.setGravity(Gravity.CENTER_VERTICAL);
+    ImageView appLogo=new ImageView(this);
+    appLogo.setImageResource(R.drawable.cashtrack_icon);
+    appLogo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+    LinearLayout.LayoutParams logoParams=new LinearLayout.LayoutParams(dp(44),dp(44));
+    logoParams.rightMargin=dp(10);
+    header.addView(appLogo,logoParams);
+
+    LinearLayout brand=new LinearLayout(this);
+    brand.setOrientation(LinearLayout.VERTICAL);
+    TextView heading=label("CashTrack",23);
+    heading.setTypeface(null,android.graphics.Typeface.BOLD);
+    heading.setPadding(0,0,0,0);
+    brand.addView(heading);
+    TextView tagline=label("Crypto portfolio",12);
+    tagline.setPadding(0,0,0,0);
+    brand.addView(tagline);
+    header.addView(brand,new LinearLayout.LayoutParams(0,-2,1f));
+
+    chartButton=new Button(this);
+    chartButton.setText("◔");chartButton.setTextSize(22);chartButton.setGravity(Gravity.CENTER);
+    chartButton.setMinWidth(0);chartButton.setMinimumWidth(0);chartButton.setPadding(0,0,0,0);
+    chartButton.setLayoutParams(new LinearLayout.LayoutParams(dp(44),dp(44)));
+    chartButton.setContentDescription("Open portfolio chart");
+    header.addView(chartButton);
+    chartButton.setOnClickListener(v->showChart());
+
+    ImageButton historyButton=new ImageButton(this);
+    historyButton.setImageResource(R.drawable.ic_trending_up);
+    historyButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
+    historyButton.setPadding(dp(13),dp(13),dp(13),dp(13));
+    historyButton.setBackgroundResource(android.R.drawable.btn_default);
+    historyButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(buttonColor()));
+    historyButton.setLayoutParams(new LinearLayout.LayoutParams(dp(44),dp(44)));
+    historyButton.setContentDescription("Open asset price history");
+    header.addView(historyButton);
+    historyButton.setOnClickListener(v->showHistoryPage());
+
+    themeButton=new Button(this);
+    themeButton.setText("☰");themeButton.setTextSize(22);themeButton.setGravity(Gravity.CENTER);
+    themeButton.setMinWidth(0);themeButton.setMinimumWidth(0);themeButton.setPadding(0,0,0,0);
+    themeButton.setLayoutParams(new LinearLayout.LayoutParams(dp(44),dp(44)));
+    themeButton.setContentDescription("Open menu");
+    header.addView(themeButton);
+    themeButton.setOnClickListener(v->openMenu());
+    root.addView(header);
+
+    LinearLayout overview=new LinearLayout(this);
+    overview.setOrientation(LinearLayout.VERTICAL);
+    overview.setPadding(dp(16),dp(14),dp(16),dp(14));
+    overview.setBackgroundColor(cardColor());
+    LinearLayout.LayoutParams overviewParams=new LinearLayout.LayoutParams(-1,-2);
+    overviewParams.topMargin=dp(18);
+    root.addView(overview,overviewParams);
+    TextView overviewTitle=label("TOTAL PORTFOLIO VALUE",12);
+    overviewTitle.setTypeface(null,android.graphics.Typeface.BOLD);
+    overviewTitle.setLetterSpacing(0.06f);
+    overviewTitle.setPadding(dp(2),dp(2),dp(2),dp(4));
+    overview.addView(overviewTitle);
+    total=label("—",30);
+    total.setTypeface(null,android.graphics.Typeface.BOLD);
+    total.setPadding(dp(2),dp(3),dp(2),dp(3));
+    overview.addView(total);
+    TextView privacy=label("Watch-only • Holdings stored on this device",12);
+    privacy.setPadding(dp(2),dp(2),dp(2),dp(2));
+    overview.addView(privacy);
+
+    LinearLayout statusCard=new LinearLayout(this);
+    statusCard.setOrientation(LinearLayout.VERTICAL);
+    statusCard.setPadding(dp(12),dp(8),dp(12),dp(8));
+    statusCard.setBackgroundColor(cardColor());
+    LinearLayout.LayoutParams statusParams=new LinearLayout.LayoutParams(-1,-2);
+    statusParams.topMargin=dp(10);
+    root.addView(statusCard,statusParams);
+    status=label("Prices not loaded",12);
+    status.setPadding(dp(2),dp(2),dp(2),dp(2));
+    statusCard.addView(status);
+    copyErrorButton=new Button(this);
+    copyErrorButton.setText("Copy diagnostic error");
+    copyErrorButton.setAllCaps(false);
+    copyErrorButton.setVisibility(View.GONE);
+    statusCard.addView(copyErrorButton);
+    copyErrorButton.setOnClickListener(v->{
+      android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+      clipboard.setPrimaryClip(android.content.ClipData.newPlainText("CashTrack diagnostic message",status.getText()));
+      Toast.makeText(this,"Full diagnostic message copied",Toast.LENGTH_SHORT).show();
+    });
+
+    LinearLayout actions=new LinearLayout(this);
+    actions.setOrientation(LinearLayout.HORIZONTAL);
+    LinearLayout.LayoutParams actionsParams=new LinearLayout.LayoutParams(-1,-2);
+    actionsParams.topMargin=dp(12);
+    root.addView(actions,actionsParams);
+    Button addAssetButton=new Button(this);
+    addAssetButton.setText("+ Add asset");addAssetButton.setAllCaps(false);
+    actions.addView(addAssetButton,new LinearLayout.LayoutParams(0,dp(50),1f));
+    addAssetButton.setOnClickListener(v->addAssetDialog());
+    View actionGap=new View(this);
+    actions.addView(actionGap,new LinearLayout.LayoutParams(dp(8),1));
+    Button refreshButton=new Button(this);
+    refreshButton.setText("↻ Refresh prices");refreshButton.setAllCaps(false);
+    actions.addView(refreshButton,new LinearLayout.LayoutParams(0,dp(50),1f));
+    refreshButton.setOnClickListener(v->refresh());
+
+    TextView assetsHeading=label("Your assets",21);
+    assetsHeading.setTypeface(null,android.graphics.Typeface.BOLD);
+    assetsHeading.setPadding(dp(2),dp(18),dp(2),dp(2));
+    root.addView(assetsHeading);
+    TextView assetsHint=label("Market price, quantity and current value",12);
+    assetsHint.setPadding(dp(2),0,dp(2),dp(4));
+    root.addView(assetsHint);
+
+    items=new LinearLayout(this);
+    items.setOrientation(LinearLayout.VERTICAL);
+    root.addView(items);
+    performanceHolder=new LinearLayout(this);
+    performanceHolder.setOrientation(LinearLayout.VERTICAL);
+    LinearLayout.LayoutParams performanceParams=new LinearLayout.LayoutParams(-1,-2);
+    performanceParams.topMargin=dp(12);
+    root.addView(performanceHolder,performanceParams);
+    render();
+  }
 
   int chartAssetPreferredColor(JSONObject a){
     String type=a.optString("type","").toUpperCase(Locale.US);
@@ -495,27 +626,86 @@ public class MainActivity extends Activity {
   }
 
   String key(JSONObject a){return a.optString("type")+":"+a.optString("id");}
-  void render(){if(items==null)return;items.removeAllViews();double sum=0;boolean incomplete=false;
-    for(int i=0;i<assets.length();i++){JSONObject a=assets.optJSONObject(i);if(a==null)continue;final int index=i;String k=key(a);Double price=prices.get(k);double qty=a.optDouble("quantity",0);String title=a.optString("name","Token");
-      String val=price==null?"Price unavailable":formatValue(qty*price);if(price==null)incomplete=true;else sum+=qty*price;
-      LinearLayout row=new LinearLayout(this);row.setOrientation(1);row.setPadding(dp(12),dp(8),dp(12),dp(8));row.setBackgroundColor(cardColor());LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(8);items.addView(row,lp);
-      LinearLayout titleRow=new LinearLayout(this);titleRow.setOrientation(0);titleRow.setGravity(Gravity.CENTER_VERTICAL);
-      ImageView icon=new ImageView(this);int iconId;
+  void render(){
+    if(items==null)return;
+    items.removeAllViews();
+    double sum=0;
+    boolean incomplete=false;
+    for(int i=0;i<assets.length();i++){
+      JSONObject a=assets.optJSONObject(i);
+      if(a==null)continue;
+      final int index=i;
+      String k=key(a);
+      Double price=prices.get(k);
+      double qty=a.optDouble("quantity",0);
+      String title=a.optString("name","Token");
+      String val=price==null?"Price unavailable":formatValue(qty*price);
+      if(price==null)incomplete=true;else sum+=qty*price;
+
+      LinearLayout row=new LinearLayout(this);
+      row.setOrientation(LinearLayout.HORIZONTAL);
+      row.setGravity(Gravity.CENTER_VERTICAL);
+      row.setPadding(dp(12),dp(10),dp(10),dp(10));
+      row.setBackgroundColor(cardColor());
+      LinearLayout.LayoutParams rowParams=new LinearLayout.LayoutParams(-1,-2);
+      rowParams.topMargin=dp(8);
+      items.addView(row,rowParams);
+
+      LinearLayout identity=new LinearLayout(this);
+      identity.setOrientation(LinearLayout.HORIZONTAL);
+      identity.setGravity(Gravity.CENTER_VERTICAL);
+      row.addView(identity,new LinearLayout.LayoutParams(0,-2,1f));
+
+      ImageView icon=new ImageView(this);
+      int iconId;
       String assetType=a.optString("type");
       if("BCH".equalsIgnoreCase(assetType))iconId=R.drawable.ic_asset_bch;
       else if("PI".equalsIgnoreCase(assetType))iconId=R.drawable.ic_asset_pi;
       else if("USDT".equalsIgnoreCase(assetType))iconId=R.drawable.ic_asset_usdt;
       else iconId=R.drawable.ic_asset_cashtoken;
-      LinearLayout.LayoutParams iconLp=new LinearLayout.LayoutParams(dp(22),dp(22));iconLp.rightMargin=dp(7);
-      icon.setImageResource(iconId);icon.setScaleType(ImageView.ScaleType.FIT_CENTER);titleRow.addView(icon,iconLp);String iconMode=a.optString("icon_mode","auto");
+      LinearLayout.LayoutParams iconParams=new LinearLayout.LayoutParams(dp(34),dp(34));
+      iconParams.rightMargin=dp(10);
+      icon.setImageResource(iconId);
+      icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+      identity.addView(icon,iconParams);
+      String iconMode=a.optString("icon_mode","auto");
       if("custom".equals(iconMode))loadCustomAssetIcon(icon,a.optString("icon_url",""));
       else if("default".equals(iconMode))icon.setImageResource(R.drawable.ic_asset_cashtoken);
       else if("CashToken".equalsIgnoreCase(assetType))loadCashTokenIcon(icon,a.optString("id"),iconMode,a.optString("icon_url",""));
-      TextView assetTitle=label(title+" ("+assetType+")",18);assetTitle.setPadding(dp(2),dp(8),dp(4),dp(8));titleRow.addView(assetTitle);
-      row.addView(titleRow);row.addView(label("Quantity: "+a.optString("quantity")+"   •   "+val,15));
-      addButton(row,"Edit / Remove",()->editDialog(index));
+
+      LinearLayout details=new LinearLayout(this);
+      details.setOrientation(LinearLayout.VERTICAL);
+      identity.addView(details,new LinearLayout.LayoutParams(0,-2,1f));
+      TextView assetTitle=label(title,16);
+      assetTitle.setTypeface(null,android.graphics.Typeface.BOLD);
+      assetTitle.setPadding(0,0,0,dp(3));
+      assetTitle.setMaxLines(2);
+      details.addView(assetTitle);
+      TextView quantity=label("Qty  "+a.optString("quantity"),12);
+      quantity.setPadding(0,0,0,0);
+      details.addView(quantity);
+
+      LinearLayout valueColumn=new LinearLayout(this);
+      valueColumn.setOrientation(LinearLayout.VERTICAL);
+      valueColumn.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+      row.addView(valueColumn,new LinearLayout.LayoutParams(-2,-2));
+      TextView valueText=label(val,15);
+      valueText.setTypeface(null,android.graphics.Typeface.BOLD);
+      valueText.setGravity(Gravity.RIGHT);
+      valueText.setPadding(0,0,0,dp(2));
+      valueColumn.addView(valueText);
+      Button editButton=new Button(this);
+      editButton.setText("Edit");
+      editButton.setAllCaps(false);
+      editButton.setTextSize(12);
+      editButton.setMinHeight(0);
+      editButton.setMinimumHeight(0);
+      editButton.setPadding(dp(8),0,dp(8),0);
+      valueColumn.addView(editButton,new LinearLayout.LayoutParams(-2,dp(34)));
+      editButton.setOnClickListener(v->editDialog(index));
     }
-    total.setText("Known value: "+formatValue(sum)+" "+displayCurrency);if(incomplete)total.append("\n(Excludes unpriced assets)");
+    total.setText(formatValue(sum));
+    if(incomplete)total.append("\nSome assets have no available price");
     if(!incomplete&&!assets.toString().equals("[]")&&Double.isFinite(sum)&&sum>=0)recordPortfolioSnapshot(sum);
     renderPerformance();
     applyTheme();
