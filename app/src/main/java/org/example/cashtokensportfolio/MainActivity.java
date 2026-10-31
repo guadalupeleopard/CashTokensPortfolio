@@ -951,9 +951,9 @@ public class MainActivity extends Activity {
     String summary=String.valueOf(value);
     return summary.length()>180?summary.substring(0,180)+"…":summary;
   }
-  // Prefer IPv4 when both address families are available, but retain IPv6
-  // addresses so requests still work on IPv6-only networks. OkHttp tries
-  // alternate resolved addresses when a connection attempt fails.
+  // Try IPv4 first when DNS provides both families, then explicitly retry with
+  // IPv4-only DNS if the normal dual-stack connection fails. The normal client
+  // still supports IPv6-only networks.
   private static final okhttp3.OkHttpClient NETWORK_CLIENT =
       new okhttp3.OkHttpClient.Builder()
           .dns(hostname -> {
@@ -966,14 +966,40 @@ public class MainActivity extends Activity {
           .followRedirects(true)
           .build();
 
+  private static final okhttp3.OkHttpClient IPV4_CLIENT =
+      new okhttp3.OkHttpClient.Builder()
+          .dns(hostname -> {
+            List<InetAddress> addresses = new ArrayList<>();
+            for (InetAddress address : okhttp3.Dns.SYSTEM.lookup(hostname)) {
+              if (address instanceof java.net.Inet4Address) addresses.add(address);
+            }
+            if (addresses.isEmpty()) throw new UnknownHostException("No IPv4 address available for " + hostname);
+            return addresses;
+          })
+          .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+          .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+          .followRedirects(true)
+          .build();
+
   Object fetchAny(String url)throws Exception{
     okhttp3.Request request=new okhttp3.Request.Builder().url(url)
         .header("Accept","application/json")
-        .header("User-Agent","CashTrack/1.0.5")
+        .header("User-Agent","CashTrack/1.0.6")
         .build();
-    try(okhttp3.Response response=NETWORK_CLIENT.newCall(request).execute()){
-      String body=response.body()!=null?response.body().string():"";
-      if(!response.isSuccessful())throw new IOException("HTTP "+response.code()+(body.isEmpty()?"":"; body: "+body.substring(0,Math.min(180,body.length()))));
+    okhttp3.Response response;
+    try {
+      response = NETWORK_CLIENT.newCall(request).execute();
+    } catch (IOException primaryFailure) {
+      try {
+        response = IPV4_CLIENT.newCall(request).execute();
+      } catch (IOException ipv4Failure) {
+        ipv4Failure.addSuppressed(primaryFailure);
+        throw ipv4Failure;
+      }
+    }
+    try(okhttp3.Response closeableResponse=response){
+      String body=closeableResponse.body()!=null?closeableResponse.body().string():"";
+      if(!closeableResponse.isSuccessful())throw new IOException("HTTP "+closeableResponse.code()+(body.isEmpty()?"":"; body: "+body.substring(0,Math.min(180,body.length()))));
       try{return new JSONTokener(body).nextValue();}
       catch(JSONException e){throw new IOException("invalid JSON response: "+body.substring(0,Math.min(180,body.length())),e);}
     }
