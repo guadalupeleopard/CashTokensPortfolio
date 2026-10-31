@@ -127,20 +127,23 @@ public class DailyPortfolioWorker extends Worker {
                     .followRedirects(true)
                     .build();
 
-    private String describeFailure(Throwable error) {
-        if (error == null) return "unknown error";
+    private String briefException(Throwable error) {
+        if (error == null) return "unknown";
         StringBuilder out = new StringBuilder(error.getClass().getSimpleName());
         if (error.getMessage() != null && !error.getMessage().trim().isEmpty()) out.append(": ").append(error.getMessage().trim());
-        Throwable cause = error.getCause();
-        if (cause != null && cause != error) {
-            out.append(" | caused by ").append(cause.getClass().getSimpleName());
-            if (cause.getMessage() != null && !cause.getMessage().trim().isEmpty()) out.append(": ").append(cause.getMessage().trim());
-        }
-        for (Throwable suppressed : error.getSuppressed()) {
-            out.append(" | suppressed ").append(suppressed.getClass().getSimpleName());
-            if (suppressed.getMessage() != null && !suppressed.getMessage().trim().isEmpty()) out.append(": ").append(suppressed.getMessage().trim());
-        }
         String result = out.toString();
+        return result.length() > 320 ? result.substring(0, 320) + "…" : result;
+    }
+
+    private String describeFailure(Throwable error) {
+        if (error == null) return "unknown error";
+        String message = error.getMessage();
+        if (message != null && message.startsWith("Network attempts failed;")) {
+            return message.length() > 1000 ? message.substring(0, 1000) + "…" : message;
+        }
+        String result = briefException(error);
+        Throwable cause = error.getCause();
+        if (cause != null && cause != error) result += " | caused by " + briefException(cause);
         return result.length() > 700 ? result.substring(0, 700) + "…" : result;
     }
 
@@ -148,7 +151,7 @@ public class DailyPortfolioWorker extends Worker {
         okhttp3.Request request = new okhttp3.Request.Builder()
                 .url(url)
                 .header("Accept", "application/json")
-                .header("User-Agent", "CashTrack/1.0.7")
+                .header("User-Agent", "CashTrack/1.0.8")
                 .build();
         okhttp3.Response response;
         String connectionPath = "dual-stack";
@@ -159,8 +162,8 @@ public class DailyPortfolioWorker extends Worker {
             try {
                 response = IPV4_CLIENT.newCall(request).execute();
             } catch (IOException ipv4Failure) {
-                throw new IOException("Network attempts failed; dual-stack: " + describeFailure(primaryFailure)
-                        + "; IPv4-only retry: " + describeFailure(ipv4Failure), ipv4Failure);
+                throw new IOException("Network attempts failed; dual-stack: " + briefException(primaryFailure)
+                        + "; IPv4-only retry: " + briefException(ipv4Failure), ipv4Failure);
             }
         }
         try (okhttp3.Response closeableResponse = response) {
