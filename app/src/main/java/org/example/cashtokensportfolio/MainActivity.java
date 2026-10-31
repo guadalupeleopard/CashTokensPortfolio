@@ -994,10 +994,19 @@ public class MainActivity extends Activity {
           .followRedirects(true)
           .build();
 
+  // Last-resort unencrypted HTTP is restricted to the CauldronSwap indexer host.
+  // Do not weaken TLS validation or use HTTP for CoinGecko/other services.
+  private static final okhttp3.OkHttpClient HTTP_FALLBACK_CLIENT =
+      new okhttp3.OkHttpClient.Builder()
+          .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+          .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+          .followRedirects(false)
+          .build();
+
   Object fetchAny(String url)throws Exception{
     okhttp3.Request request=new okhttp3.Request.Builder().url(url)
         .header("Accept","application/json")
-        .header("User-Agent","CashTrack/1.0.8")
+        .header("User-Agent","CashTrack/1.0.10")
         .build();
     okhttp3.Response response;
     String connectionPath="IPv4-first";
@@ -1008,8 +1017,24 @@ public class MainActivity extends Activity {
       try {
         response = NETWORK_CLIENT.newCall(request).execute();
       } catch (IOException dualStackFailure) {
-        throw new IOException("Network attempts failed; IPv4-first: "+briefException(ipv4Failure)
-            +"; dual-stack fallback: "+briefException(dualStackFailure), dualStackFailure);
+        if ("indexer.riften.net".equalsIgnoreCase(new URL(url).getHost())) {
+          String httpUrl = url.replaceFirst("^https://", "http://");
+          try {
+            okhttp3.Request httpRequest = new okhttp3.Request.Builder().url(httpUrl)
+                .header("Accept", "application/json")
+                .header("User-Agent", "CashTrack/1.0.10")
+                .build();
+            connectionPath = "HTTP fallback (unencrypted)";
+            response = HTTP_FALLBACK_CLIENT.newCall(httpRequest).execute();
+          } catch (IOException httpFailure) {
+            throw new IOException("Network attempts failed; IPv4-first: "+briefException(ipv4Failure)
+                +"; dual-stack fallback: "+briefException(dualStackFailure)
+                +"; HTTP fallback: "+briefException(httpFailure), httpFailure);
+          }
+        } else {
+          throw new IOException("Network attempts failed; IPv4-first: "+briefException(ipv4Failure)
+              +"; dual-stack fallback: "+briefException(dualStackFailure), dualStackFailure);
+        }
       }
     }
     try(okhttp3.Response closeableResponse=response){
