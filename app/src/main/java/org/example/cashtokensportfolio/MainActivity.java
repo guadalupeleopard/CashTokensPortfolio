@@ -682,6 +682,7 @@ public class MainActivity extends Activity {
       notes.append("CoinGecko OK. ");
     }catch(Exception e){notes.append("CoinGecko unavailable. ");}
     int found=0,missing=0;
+    String firstCashTokenFailure=null;
     // Main-page quotes use CauldronSwap's current-price endpoint. The API
     // price is per smallest token unit, so multiply by 10^token decimals to
     // obtain satoshis per whole token before converting to USD.
@@ -689,20 +690,33 @@ public class MainActivity extends Activity {
       JSONObject asset=assets.optJSONObject(i);
       if(asset==null||!"CashToken".equals(asset.optString("type")))continue;
       String category=asset.optString("id").toLowerCase(Locale.US);
+      String stage="current-price request";
       try{
         String url="https://indexer.riften.net/cauldron/price/"+category+"/current";
         Object response=fetchAny(url);
         Double priceUnits=extractCurrentCauldronPrice(response);
-        int decimals=fetchCauldronTokenDecimals(category);
+        if(priceUnits==null)throw new IOException("response has no recognized positive price field: "+summarizeJson(response));
+        stage="BCMR metadata request";
+        Object metadata=fetchAny("https://indexer.riften.net/bcmr/token/"+category);
+        int decimals=extractCauldronTokenDecimals(metadata);
+        if(decimals<0)throw new IOException("BCMR response has no decimals field: "+summarizeJson(metadata));
+        if(decimals>18)throw new IOException("unsupported token decimals: "+decimals);
+        stage="BCH/USD conversion";
         Double bch=prices.get("BCH:bch");
-        if(priceUnits!=null&&decimals>=0&&decimals<=18&&bch!=null){
-          double sats=priceUnits*Math.pow(10d,decimals);
-          double usd=(sats/100000000d)*bch;
-          if(Double.isFinite(usd)&&usd>0){prices.put(key(asset),usd);found++;}else missing++;
-        }else missing++;
-      }catch(Exception e){missing++;}
+        if(bch==null||!Double.isFinite(bch)||bch<=0)throw new IOException("BCH/USD price unavailable");
+        double sats=priceUnits*Math.pow(10d,decimals);
+        double usd=(sats/100000000d)*bch;
+        if(Double.isFinite(usd)&&usd>0){prices.put(key(asset),usd);found++;}
+        else throw new IOException("calculated USD price is not positive/finite; API price="+priceUnits+", decimals="+decimals+", BCH/USD="+bch);
+      }catch(Exception e){
+        missing++;
+        String detail=stage+": "+diagnosticMessage(e);
+        if(firstCashTokenFailure==null)firstCashTokenFailure=category.substring(0,Math.min(8,category.length()))+"… "+detail;
+        android.util.Log.w("CashTrackPrice","CashToken "+category+" failed at "+detail,e);
+      }
     }
     notes.append("CashTokens priced from CauldronSwap: ").append(found).append("; unavailable: ").append(missing);
+    if(firstCashTokenFailure!=null)notes.append(". First failure: ").append(firstCashTokenFailure);
     final String message=notes.toString();runOnUiThread(()->{status.setText(message);render();});
   }).start();}
 
@@ -920,7 +934,46 @@ public class MainActivity extends Activity {
     JSONObject market=t.optJSONObject("market");if(market!=null)return extractSats(market);
     return null;
   }
-  Object fetchAny(String url)throws Exception{HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection();c.setConnectTimeout(10000);c.setReadTimeout(10000);c.setRequestProperty("Accept","application/json");c.setRequestProperty("User-Agent","CashTokensPortfolio/1.1");try{if(c.getResponseCode()!=200)throw new IOException("HTTP "+c.getResponseCode());ByteArrayOutputStream b=new ByteArrayOutputStream();try(InputStream in=c.getInputStream()){byte[] buf=new byte[4096];int n;while((n=in.read(buf))!=-1)b.write(buf,0,n);}return new JSONTokener(b.toString("UTF-8")).nextValue();}finally{c.disconnect();}}
+  String readHttpBody(HttpURLConnection c,int code)throws IOException{
+    InputStream stream=code>=400?c.getErrorStream():c.getInputStream();
+    if(stream==null)return "";
+    ByteArrayOutputStream b=new ByteArrayOutputStream();
+    try(InputStream in=stream){byte[] buf=new byte[2048];int n;while((n=in.read(buf))!=-1)b.write(buf,0,n);}
+    return b.toString("UTF-8");
+  }
+  String diagnosticMessage(Exception e){
+    String message=e.getMessage();
+    if(message==null||message.trim().isEmpty())message=e.getClass().getSimpleName();
+    return message.length()>220?message.substring(0,220)+"…":message;
+  }
+  String summarizeJson(Object value){
+    if(value==null||value==JSONObject.NULL)return "null";
+    String summary=String.valueOf(value);
+    return summary.length()>180?summary.substring(0,180)+"…":summary;
+  }
+  Object fetchAny(String url)throws Exception{
+    HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection();
+    c.setConnectTimeout(10000);c.setReadTimeout(10000);c.setInstanceFollowRedirects(true);
+    c.setRequestProperty("Accept","application/json");c.setRequestProperty("User-Agent","CashTrack/1.0.4");
+    try{
+      int code=c.getResponseCode();
+      String body=readHttpBody(c,code);
+      if(code!=200)throw new IOException("HTTP "+code+(body.isEmpty()?"":"; body: "+body.substring(0,Math.min(180,body.length()))));
+      try{return new JSONTokener(body).nextValue();}
+      catch(JSONException e){throw new IOException("invalid JSON response: "+body.substring(0,Math.min(180,body.length())),e);}
+    }finally{c.disconnect();}
+  }
   void putPrice(String key,JSONObject data){if(data!=null&&data.has("usd"))prices.put(key,data.optDouble("usd"));}
-  JSONObject fetch(String url)throws Exception{HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection();c.setConnectTimeout(10000);c.setReadTimeout(10000);c.setRequestProperty("Accept","application/json");c.setRequestProperty("User-Agent","CashTokensPortfolio/1.0");try{if(c.getResponseCode()!=200)throw new IOException("HTTP "+c.getResponseCode());ByteArrayOutputStream b=new ByteArrayOutputStream();try(InputStream in=c.getInputStream()){byte[] buf=new byte[4096];int n;while((n=in.read(buf))!=-1)b.write(buf,0,n);}return new JSONObject(b.toString("UTF-8"));}finally{c.disconnect();}}
+  JSONObject fetch(String url)throws Exception{
+    HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection();
+    c.setConnectTimeout(10000);c.setReadTimeout(10000);c.setInstanceFollowRedirects(true);
+    c.setRequestProperty("Accept","application/json");c.setRequestProperty("User-Agent","CashTrack/1.0.4");
+    try{
+      int code=c.getResponseCode();
+      String body=readHttpBody(c,code);
+      if(code!=200)throw new IOException("HTTP "+code+(body.isEmpty()?"":"; body: "+body.substring(0,Math.min(180,body.length()))));
+      try{return new JSONObject(body);}
+      catch(JSONException e){throw new IOException("invalid JSON response: "+body.substring(0,Math.min(180,body.length())),e);}
+    }finally{c.disconnect();}
+  }
 }
