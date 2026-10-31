@@ -6,7 +6,7 @@ on:
     branches: [ main, master ]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-debug-apk:
@@ -67,3 +67,17 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # Publish only for the explicitly requested 1.0.5 release commit.
+      # Ordinary pushes and manual test builds remain artifact-only.
+      - name: Publish CashTrack debug 1.0.5 GitHub pre-release
+        if: success() && contains(github.event.head_commit.message, 'Publish CashTrack 1.0.5 release')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: CashTrackDebug1.0.5
+          name: CashTrack debug 1.0.5
+          body: |
+            CashTrack debug version 1.0.5.
+
+            Built by the latest GitHub Actions workflow and signed with the persistent CashTrack debug signing key.
+          prerelease: true
+          files: app/build/outputs/apk/debug/CashTrack-debug.apk
