@@ -70,7 +70,7 @@ jobs:
       # Publish only for the explicitly requested 1.0.5 release commit.
       # Ordinary pushes and manual test builds remain artifact-only.
       - name: Publish CashTrack debug 1.0.5 GitHub pre-release
-        if: success() && contains(github.event.head_commit.message, 'Publish CashTrack 1.0.5 release')
+        if: success() && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'Publish CashTrack 1.0.5 release'))
         uses: softprops/action-gh-release@v2
         with:
           tag_name: CashTrackDebug1.0.5
