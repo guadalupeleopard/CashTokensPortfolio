@@ -23,7 +23,7 @@ android {
         // GitHub Actions run numbers increase with each workflow run, allowing
         // newer APKs to install over older ones. Local builds default to 2.
         versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 2
-        versionName = "1.0.10"
+        versionName = "1.0.5"
     }
 
     buildTypes {
