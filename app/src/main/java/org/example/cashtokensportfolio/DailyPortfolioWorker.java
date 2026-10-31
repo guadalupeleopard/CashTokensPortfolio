@@ -95,18 +95,11 @@ public class DailyPortfolioWorker extends Worker {
         return (JSONObject) value;
     }
 
-    // Try IPv4 first when possible; if the dual-stack connection fails,
-    // retry explicitly using IPv4-only DNS. IPv6 remains supported by the
-    // normal client for networks that rely on it.
+    // Try IPv4-only first because some networks have broken IPv6 routes.
+    // If IPv4 is unavailable or fails, fall back to normal dual-stack DNS so
+    // IPv6-only networks remain supported.
     private static final okhttp3.OkHttpClient NETWORK_CLIENT =
             new okhttp3.OkHttpClient.Builder()
-                    .dns(hostname -> {
-                        java.util.List<java.net.InetAddress> addresses =
-                                new java.util.ArrayList<>(okhttp3.Dns.SYSTEM.lookup(hostname));
-                        addresses.sort((left, right) ->
-                                Integer.compare(left.getAddress().length, right.getAddress().length));
-                        return addresses;
-                    })
                     .connectTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
                     .readTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
                     .followRedirects(true)
@@ -154,16 +147,16 @@ public class DailyPortfolioWorker extends Worker {
                 .header("User-Agent", "CashTrack/1.0.8")
                 .build();
         okhttp3.Response response;
-        String connectionPath = "dual-stack";
+        String connectionPath = "IPv4-first";
         try {
-            response = NETWORK_CLIENT.newCall(request).execute();
-        } catch (IOException primaryFailure) {
-            connectionPath = "IPv4-only retry";
+            response = IPV4_CLIENT.newCall(request).execute();
+        } catch (IOException ipv4Failure) {
+            connectionPath = "dual-stack fallback";
             try {
-                response = IPV4_CLIENT.newCall(request).execute();
-            } catch (IOException ipv4Failure) {
-                throw new IOException("Network attempts failed; dual-stack: " + briefException(primaryFailure)
-                        + "; IPv4-only retry: " + briefException(ipv4Failure), ipv4Failure);
+                response = NETWORK_CLIENT.newCall(request).execute();
+            } catch (IOException dualStackFailure) {
+                throw new IOException("Network attempts failed; IPv4-first: " + briefException(ipv4Failure)
+                        + "; dual-stack fallback: " + briefException(dualStackFailure), dualStackFailure);
             }
         }
         try (okhttp3.Response closeableResponse = response) {
